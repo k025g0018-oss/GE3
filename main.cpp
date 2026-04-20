@@ -1,5 +1,7 @@
 #include <windows.h>
 #include <cstdint> // int32_t
+#include <string> // 文字列
+#include <format>
 
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -14,6 +16,39 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 	// 標準のメッセージ処理を行う
 	return DefWindowProc(hwnd, msg, wparam, lparam);
+}
+
+void Log(const std::string& messege) {
+	OutputDebugStringA(messege.c_str());
+}
+
+// ConvertSring
+std::wstring ConvertString(const std::string& str) {
+	if (str.empty()) {
+		return std::wstring();
+	}
+
+	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
+	if (sizeNeeded == 0) {
+		return std::wstring();
+	}
+	std::wstring result(sizeNeeded, 0);
+	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
+	return result;
+}
+
+std::string ConvertString(const std::wstring& str) {
+	if (str.empty()) {
+		return std::string();
+	}
+
+	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
+	if (sizeNeeded == 0) {
+		return std::string();
+	}
+	std::string result(sizeNeeded, 0);
+	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
+	return result;
 }
 
 // windowsアプリでのエントリーポイント(main関数)
@@ -74,6 +109,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// ゲームの処理
 		}
 	}
+
+	// 文字列を格納する
+	std::string str0{"STRING!!!"};
+
+	// 整数を文字列にする
+	std::string str1{std::to_string(10)};
+
+	int enemyHp = 100;
+
+	std::string texturePath = "pikatyuu.png";
+
+	// 変数委から肩を推論してくれる
+	Log(std::format("enemyHp{}, texturePath:{}\n", enemyHp, texturePath));
+
+	// コンパイルエラーになる
+	//Log(std::format("enemyHp:{} texture:{}\n", enemyHp));
+
+	// string->wstring
+	std::wstring ConvertString(const std::string & str);
+	// wstring->string
+	std::string ConvertString(const std::wstring & str);
+
+	Log(ConvertString(std::format(L"number:{}\n", ConvertString(str1))));
+
+	Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
 
 	return 0;
 }
