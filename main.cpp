@@ -2,6 +2,10 @@
 #include <cstdint> // int32_t
 #include <string> // 文字列
 #include <format>
+#include <filesystem> // ファイルやディレクトリに関する操作を行うライブラリ
+#include <fstream> // ファイルに書いたり読んだりするライブラリ
+#include <chrono> // 時間を扱うライブラリ
+
 
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -18,11 +22,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-void Log(const std::string& messege) {
+void Log(std::ostream& os,const std::string& messege) {
+	os << messege << std::endl;
 	OutputDebugStringA(messege.c_str());
 }
 
-// ConvertSring
+// ConvertString
 std::wstring ConvertString(const std::string& str) {
 	if (str.empty()) {
 		return std::wstring();
@@ -53,6 +58,26 @@ std::string ConvertString(const std::wstring& str) {
 
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
+	// ログのディレクトリを用意
+	std::filesystem::create_directory("logs");
+
+	// 現在時刻を取得 (UTC時刻)
+	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+	// ログファイルの名前にコンマ何秒はいらないので、削って秒にする
+	std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
+		nowSeconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+	// 日本時間 (PCの設定時間) に変換
+	std::chrono::zoned_time localTime{ std::chrono::current_zone(), nowSeconds };
+	// formatを使って年月日_時分秒の文字列に変換
+	std::string dateString = std::format("{:%Y%m%d_%H%M%S}", localTime);
+	// 時刻を使ってファイル名を決定
+	std::string logFilePath = std::string("logs/") + dateString + ".log";
+	// ファイルを作って書き込み準備
+	std::ofstream logStream(logFilePath);
+
+	Log(logStream, "ぶっ飛ばすぜべいべ");
+
 	// 出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello,DirectX!\n");
 
@@ -121,7 +146,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	std::string texturePath = "pikatyuu.png";
 
 	// 変数委から肩を推論してくれる
-	Log(std::format("enemyHp{}, texturePath:{}\n", enemyHp, texturePath));
+	//Log(std::format("enemyHp{}, texturePath:{}\n", enemyHp, texturePath));
 
 	// コンパイルエラーになる
 	//Log(std::format("enemyHp:{} texture:{}\n", enemyHp));
@@ -131,9 +156,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// wstring->string
 	std::string ConvertString(const std::wstring & str);
 
-	Log(ConvertString(std::format(L"number:{}\n", ConvertString(str1))));
+	//Log(ConvertString(std::format(L"number:{}\n", ConvertString(str1))));
 
-	Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
+	//Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
 
 	return 0;
 }
