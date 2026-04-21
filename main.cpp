@@ -254,10 +254,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	//Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
 
-	// わざとクラッシュさせる用に書く
-	uint32_t* p = nullptr;
-	*p = 100;
-
 	// --- メインループ ---
 	// ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT) {
