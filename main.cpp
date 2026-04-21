@@ -5,7 +5,15 @@
 #include <filesystem> // ファイルやディレクトリに関する操作を行うライブラリ
 #include <fstream> // ファイルに書いたり読んだりするライブラリ
 #include <chrono> // 時間を扱うライブラリ
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <cassert>
 
+// libのリンク
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+
+// --- 関数の定義エリア ---
 
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -22,11 +30,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-void Log(std::ostream& os,const std::string& messege) {
-	os << messege << std::endl;
-	OutputDebugStringA(messege.c_str());
-}
-
+// 文字列変換用
 // ConvertString
 std::wstring ConvertString(const std::string& str) {
 	if (str.empty()) {
@@ -56,6 +60,20 @@ std::string ConvertString(const std::wstring& str) {
 	return result;
 }
 
+// Log関数
+void Log(std::ostream& os,const std::string& messege) {
+	os << messege << std::endl;
+	OutputDebugStringA(messege.c_str());
+}
+
+// ワイド文字版のLog関数
+void Log(std::ostream& os, const std::wstring& messege) {
+	std::string str = ConvertString(messege);
+	os << str << std::endl;
+	OutputDebugStringA(str.c_str());
+}
+
+// --- メイン処理 ---
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -122,18 +140,64 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
-	MSG msg{};
+	// --- DXGI初期化 ---
 
-	// ウィンドウのxボタンが押されるまでループ
-	while (msg.message != WM_QUIT) {
-		//windowにメッセージが来てたら最優先で処理させる
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		} else {
-			// ゲームの処理
+	// DXGIファクトリーの生成
+	IDXGIFactory7* dxgiFactory = nullptr;
+
+	// HRESULTはWindowsケイのエラーコード、関数が成功したかどうかをSUCCEEDEDマクロで判定できる
+	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+
+	// 初期化の根本的な部分でエラーが出た場合はプログラムが間違っているか、どうにもできない場合はassertにしておく
+	assert(SUCCEEDED(hr));
+
+	// 使用するアダプタ用の変数、最初にnullptr
+	IDXGIAdapter4* useAdapter = nullptr;
+
+	// 良い順にアダプタを頼む
+	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; ++i) {
+		// アダプターの情報を取得する
+		DXGI_ADAPTER_DESC3 adapterDesc{};
+		hr = useAdapter->GetDesc3(&adapterDesc);
+		assert(SUCCEEDED(hr)); // 取得できないのは一大事
+
+		// ソフトウェアアダプタでなければ採用
+		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
+			// 採用したアダプタの情報をログに出力。wstringの方なので注意
+			Log(logStream, std::format(L"Use Adapter:{}\n", adapterDesc.Description));
+			break;
+		}
+		useAdapter = nullptr; // ソフトウェアアダプタの場合は見なかったことにする
+	}
+
+	// 適切なアダプタが見つからなかったので起動できない
+	assert(useAdapter != nullptr);
+
+	// --- D3D12Deviceの生成 ---
+	ID3D12Device* device = nullptr;
+	// 機能レベルとログ出力用の文字列
+	D3D_FEATURE_LEVEL featureLevels[]{
+		D3D_FEATURE_LEVEL_12_2, D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0
+	};
+	const char* featureLevelStrings[] = {"12.2", "12.1", "12.0"};
+	// 高い順に生成できるか試していく
+	for (size_t i = 0; i < _countof(featureLevels); ++i) {
+		// 採用したアダプターでデバイスを生成
+		hr = D3D12CreateDevice(useAdapter, featureLevels[i], IID_PPV_ARGS(&device));
+		// 指定した機能レベルでデバイスが生成できたかを確認
+		if (SUCCEEDED(hr)) {
+			// 生成できたのでログ出力を行ってループを抜ける
+			Log(logStream, std::format("FeatureLevel : {}\n", featureLevelStrings[i]));
+			break; // 生成できたらループを抜ける
 		}
 	}
+
+	// デバイスの生成がうまくいかなかったので起動できない
+	assert(device != nullptr);
+	Log(logStream, "Complete create D3D12Device!!!\n"); // 初期化完了のログを出す
+
+	// --- 文字列 ---
+	MSG msg{};
 
 	// 文字列を格納する
 	std::string str0{"STRING!!!"};
@@ -159,6 +223,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Log(ConvertString(std::format(L"number:{}\n", ConvertString(str1))));
 
 	//Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
+
+	// --- メインループ ---
+	// ウィンドウのxボタンが押されるまでループ
+	while (msg.message != WM_QUIT) {
+		//windowにメッセージが来てたら最優先で処理させる
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		} else {
+			// ゲームの処理
+		}
+	}
 
 	return 0;
 }
