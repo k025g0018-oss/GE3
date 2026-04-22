@@ -226,6 +226,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(device != nullptr);
 	Log(logStream, "Complete create D3D12Device!!!\n"); // 初期化完了のログを出す
 
+	// --- CommandQueueの生成 ---
+	ID3D12CommandQueue* commandQueue = nullptr;
+	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
+	hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue));
+	//コマンドキューの生成がうまくいかなかったので起動できない
+	assert(SUCCEEDED(hr));
+
+	// --- CommandListの生成 ---
+	// コマンドアロケータの生成
+	ID3D12CommandAllocator* commandAllocator = nullptr;
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
+	// コマンドアロケータの生成がうまくいかなかったので起動できない
+	assert(SUCCEEDED(hr));
+
+	// コマンドリストの生成
+	ID3D12GraphicsCommandList* commandList = nullptr;
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator, nullptr, IID_PPV_ARGS(&commandList));
+	// コマンドリストの生成がうまくいかなかったので起動できない
+	assert(SUCCEEDED(hr));
+
 	// --- 文字列 ---
 	MSG msg{};
 
