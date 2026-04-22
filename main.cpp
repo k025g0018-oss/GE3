@@ -64,9 +64,9 @@ std::string ConvertString(const std::wstring& str) {
 }
 
 // Log関数
-void Log(std::ostream& os,const std::string& messege) {
-	os << messege << std::endl;
-	OutputDebugStringA(messege.c_str());
+void Log(std::ostream& os,const std::string& message) {
+	os << message << std::endl;
+	OutputDebugStringA(message.c_str());
 }
 
 // ワイド文字版のLog関数
@@ -246,33 +246,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// コマンドリストの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
+	// --- SwapChainの生成 ---
+	IDXGISwapChain4* swapChain = nullptr;
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+	swapChainDesc.Width = kClientWidth; // 画面の幅。ウィンドウのクライアント領域を同じものにしておく。
+	swapChainDesc.Height = kClientHeight; // 画面の高さ。ウィンドウのクライアント領域を同じものにしておく。
+	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // 色の形式
+	swapChainDesc.SampleDesc.Count = 1; // マルチサンプルしない
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // 描画のターゲットとして利用する
+	swapChainDesc.BufferCount = 2; // ダブルバッファ
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; // モニターにうつしたら、中身を廃棄
+	// コマンドキュー、ウィンドウハンドル、設定を渡して生成する。
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue, hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(&swapChain));
+	assert(SUCCEEDED(hr));
+
+	// --- DescriptorHeapの生成 ---
+	// ディスクリプタヒープの生成
+	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;
+	D3D12_DESCRIPTOR_HEAP_DESC rtvDescriptorHeapDesc{};
+	rtvDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; // レンダーターゲットビュー用
+	rtvDescriptorHeapDesc.NumDescriptors = 2; // ダブルバッファように2つ、多くても別に構わない
+	hr = device->CreateDescriptorHeap(&rtvDescriptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
+	assert(SUCCEEDED(hr));
+
 	// --- 文字列 ---
 	MSG msg{};
-
-	// 文字列を格納する
-	std::string str0{"STRING!!!"};
-
-	// 整数を文字列にする
-	std::string str1{std::to_string(10)};
-
-	int enemyHp = 100;
-
-	std::string texturePath = "pikatyuu.png";
-
-	// 変数委から肩を推論してくれる
-	//Log(std::format("enemyHp{}, texturePath:{}\n", enemyHp, texturePath));
-
-	// コンパイルエラーになる
-	//Log(std::format("enemyHp:{} texture:{}\n", enemyHp));
 
 	// string->wstring
 	std::wstring ConvertString(const std::string & str);
 	// wstring->string
 	std::string ConvertString(const std::wstring & str);
-
-	//Log(ConvertString(std::format(L"number:{}\n", ConvertString(str1))));
-
-	//Log(ConvertString(std::format(L"WSTRING:{}\n", ConvertString(str0))));
 
 	// --- メインループ ---
 	// ウィンドウのxボタンが押されるまでループ
