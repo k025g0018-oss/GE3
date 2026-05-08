@@ -11,12 +11,14 @@
 #include <dbghelp.h> // Debug用のあれやこれやを使えるようにする
 #include <strsafe.h> // StringCchPrintfWの利用に必要
 #include <dxgidebug.h>
+#include <dxcapi.h>
 
 // libのリンク
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "Dbghelp.lib") // Debug用のあれやこれやを使えるようにする
 #pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "dxcompiler.lib")
 
 /// --- 関数の定義エリア ---
 
@@ -66,7 +68,7 @@ std::string ConvertString(const std::wstring& str) {
 }
 
 // Log関数
-void Log(std::ostream& os,const std::string& message) {
+void Log(std::ostream& os, const std::string& message) {
 	os << message << std::endl;
 	OutputDebugStringA(message.c_str());
 }
@@ -86,7 +88,7 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	GetLocalTime(&time);
 	wchar_t filePath[MAX_PATH] = {0};
 	CreateDirectory(L"./Dumps", nullptr);
-	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp", 
+	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp",
 		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
 	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
 	// processId(このexeのId)とクラッシュ(例外)の発生したthreadIdを取得
@@ -119,7 +121,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
 		nowSeconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
 	// 日本時間 (PCの設定時間) に変換
-	std::chrono::zoned_time localTime{ std::chrono::current_zone(), nowSeconds };
+	std::chrono::zoned_time localTime{std::chrono::current_zone(), nowSeconds};
 	// formatを使って年月日_時分秒の文字列に変換
 	std::string dateString = std::format("{:%Y%m%d_%H%M%S}", localTime);
 	// 時刻を使ってファイル名を決定
@@ -174,7 +176,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ShowWindow(hwnd, SW_SHOW);
 
 	/// --- DebugLayer ---
-	
+
 #ifdef _DEBUG
 	ID3D12Debug1* debugController = nullptr;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
@@ -259,7 +261,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// https://stackoverflow.com/questions/69805245/directx-12-application-is-crashing-in-windows-11
 			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
 		};
-		
+
 		// 抑制するレベル
 		D3D12_MESSAGE_SEVERITY severities[]
 			= {D3D12_MESSAGE_SEVERITY_INFO};
@@ -388,6 +390,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// FenceのSignalを持つためのイベントを作成する
 	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	assert(fenceEvent != nullptr);
+
+	/// DXCの初期化
+	// dxcCompilerを初期化
+	IDxcUtils* dxcUtils = nullptr;
+	IDxcCompiler3* dxcCompiler = nullptr;
+	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	assert(SUCCEEDED(hr));
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	assert(SUCCEEDED(hr));
+
+	// 現時点でincludeはしないが、includeに対応するための設定を行っておく
+	IDxcIncludeHandler* includeHandler = nullptr;
+	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
+	assert(SUCCEEDED(hr));
 
 	/// --- キックする ---
 	// GPUにコマンドリストの実行を行わせる
