@@ -156,8 +156,8 @@ IDxcBlob* CompileShader(
 	IDxcResult* shaderResult = nullptr;
 	hr = dxcCompiler->Compile(
 		&shaderSourceBuffer, // 読み込んだファイル
-		arguments, // コンパイルオプション
-		_countof(arguments), // コンパイルオプションの数
+		(LPCWSTR*)arguments, // コンパイルオプション
+		(UINT32)_countof(arguments), // コンパイルオプションの数
 		includeHandler, // includeが含まれた諸々
 		IID_PPV_ARGS(&shaderResult) // コンパイル結果
 	);
@@ -595,7 +595,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
 
 	// 描画の設定(ドローコール)
-	// ViewportとScirssorの設定
+	// ViewportとScissorRectの設定
 	commandList->RSSetViewports(1, &viewport);
 	commandList->RSSetScissorRects(1, &scissorRect);
 	// RootSignatureの設定
