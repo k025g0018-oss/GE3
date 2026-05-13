@@ -116,8 +116,7 @@ Matrix4x4 Matrix4x4:: MakeAffineMatrix(const Vector3& scale, const Vector3& rota
 	Matrix4x4 rotateMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
 
 	// SRTの順番で行列を合成
-	result = Multiply(scaleMatrix, rotateMatrix);
-	result = Multiply(result, translateMatrix);
+	result = Multiply(scaleMatrix, Multiply(rotateMatrix, translateMatrix));
 
 	return result;
 }
