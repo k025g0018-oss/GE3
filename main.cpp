@@ -12,6 +12,8 @@
 #include <strsafe.h> // StringCchPrintfWの利用に必要
 #include <dxgidebug.h>
 #include <dxcapi.h>
+#include "Matrix4x4.h"
+#include "Vector.h"
 
 // libのリンク
 #pragma comment(lib, "d3d12.lib")
@@ -19,18 +21,6 @@
 #pragma comment(lib, "Dbghelp.lib") // Debug用のあれやこれやを使えるようにする
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dxcompiler.lib")
-
-struct Vector2 {
-	float x, y;
-};
-
-struct Vector3 {
-	float x, y, z;
-};
-
-struct Vector4 {
-	float x, y, z, w;
-};
 
 /// --- 関数の定義エリア ---
 // ウィンドウプロシージャ
@@ -191,6 +181,8 @@ IDxcBlob* CompileShader(
 
 // バッファリソースを作る関数
 ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
+
+	size_t alignedSize = (sizeInBytes + 255) & ~255;
 	// 頂点リソース用のヒープの設定
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
 	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -200,7 +192,7 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 
 	// バッファリソース
 	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	vertexResourceDesc.Width = sizeof(Vector4) * 3;
+	vertexResourceDesc.Width = alignedSize;
 
 	// バッファの場合はこれらを1にする
 	vertexResourceDesc.Height = 1;
@@ -476,10 +468,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	// RootParameter作成
-	D3D12_ROOT_PARAMETER rootParameters[1] = {};
+	D3D12_ROOT_PARAMETER rootParameters[2] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号0とバインド
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VertexShaderで使う
+	rootParameters[1].Descriptor.ShaderRegister = 0;
 	descriptionRootSignature.pParameters = rootParameters; // ルートパラメータ配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); // 配列の長さ
 
@@ -545,6 +540,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ID3D12PipelineState* graphicsPipelineState = nullptr;
 	hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
+
+	// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	// データを書き込む
+	Matrix4x4* wvpData = nullptr;
+	// 書き込むためのアドレスを取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	// 単位行列を書き込んでおく
+	*wvpData = Matrix4x4::MakeIdentity4x4();
 
 	/// VertexResourceを生成する
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
@@ -637,6 +641,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	// マテリアルCBufferの場所を設定
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	// wvp用のBufferの場所を設定
+	commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 	// 描画(DrawCall/ドローコール)、3頂点で1つのインスタンス
 	commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -692,6 +698,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// メッセージ構造体
 	MSG msg{};
 
+	/// ---変数の宣言---
+	// Transformの変数を作る
+	Transform transform = {
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+
 	/// --- メインループ ---
 	// ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT) {
@@ -700,7 +714,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
-			// ゲームの処理
+			/// ゲームの処理
+			transform.rotate.y += 0.03f;
+			Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			*wvpData = worldMatrix;
 		}
 	}
 
@@ -724,6 +741,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		errorBlob->Release();
 	}
 	rootSignature->Release();
+	wvpResource->Release();
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
 	materialResource->Release();
