@@ -18,6 +18,7 @@
 // libのリンク
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "Dbghelp.lib") // Debug用のあれやこれやを使えるようにする
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -208,6 +209,8 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 
 	return vertexResource;
 }
+
+//ID3D12DescriptorHeap* CreateDesdcriptorHeap(ID3D12Device* device, D3D12)
 
 /// --- メイン処理 ---
 // windowsアプリでのエントリーポイント(main関数)
@@ -624,6 +627,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{0.0f, 0.0f, 0.0f}
 	};
 
+	Transform cameraTransform{
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, -5.0f}
+	};
+
+	Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+
+	Matrix4x4 cameraMatrix = Matrix4x4::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+
+	Matrix4x4 viewMatrix = Matrix4x4::Inverse(cameraMatrix);
+
+	Matrix4x4 projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+
+	
+
 	/// --- メインループ ---
 	// ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT) {
@@ -632,11 +651,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
-			/// ゲームの処理
+			/// ---ゲームの処理---
+			// 回転角を更新
 			transform.rotate.y += 0.003f;
-			Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-			*wvpData = worldMatrix;
 
+			// ワールド行列を計算
+			Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+
+			// ワールド、ビュー、プロジェクションを掛け合わせる
+			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
+
+			// wvp行列をGPUに送る
+			*wvpData = worldViewProjectionMatrix;
+
+#pragma region
 			/// --- コマンドを積む ---
 			// これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -718,6 +746,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			assert(SUCCEEDED(hr));
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
+#pragma endregion コマンドを積む処理
 		}
 	}
 
