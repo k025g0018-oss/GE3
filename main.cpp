@@ -241,6 +241,9 @@ ID3D12DescriptorHeap* CreateDesdcriptorHeap(ID3D12Device* device, D3D12_DESCRIPT
 /// --- メイン処理 ---
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+	// COMの初期化
+	CoInitializeEx(0, COINIT_MULTITHREADED);
+
 	// 誰も捕捉しなかった場合に(Unhandled)、捕捉する関数を登録
 	// main関数が始まってすぐに登録
 	SetUnhandledExceptionFilter(ExportDump);
@@ -808,6 +811,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			assert(SUCCEEDED(hr));
 #pragma endregion コマンドを積む処理
 		}
+
+		// COMの終了処理
+		CoUninitialize();
 	} // whileの終わり
 
 	/// --- ImGui終了処理 ---

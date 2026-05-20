@@ -6,4 +6,5 @@
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="DirectXGame.vcxproj" Id="93c8e758-6004-4558-8417-581133e4c936" />
+  <Project Path="externals/DirectXTex/DirectXTex_Desktop_2022.vcxproj" Id="371b9fa9-4c90-4ac6-a123-aced756d6c77" />
 </Solution>
