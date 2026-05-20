@@ -14,6 +14,13 @@
 #include <dxcapi.h>
 #include "Matrix4x4.h"
 #include "Vector.h"
+// ImGui
+#ifdef USE_IMGUI
+#include "externals/imgui/imgui.h"
+#include "externals/imgui/imgui_impl_dx12.h"
+#include "externals/imgui/imgui_impl_win32.h"
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+#endif // USE_IMGUI
 
 // libのリンク
 #pragma comment(lib, "d3d12.lib")
@@ -26,6 +33,13 @@
 /// --- 関数の定義エリア ---
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+	// ImGui
+#if USE_IMGUI
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
+		return true;
+	}
+#endif // USE_IMGUI
+
 	// メッセージに応じてゲーム固有の処理を行う
 	switch (msg) {
 		// ウィンドウが破棄された
@@ -210,7 +224,19 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 	return vertexResource;
 }
 
-//ID3D12DescriptorHeap* CreateDesdcriptorHeap(ID3D12Device* device, D3D12)
+// ID3D12DescriptorHeapの作成関数
+ID3D12DescriptorHeap* CreateDesdcriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible) {
+	// ディスクリプタヒープの生成
+	ID3D12DescriptorHeap* descriptorHeap = nullptr;
+	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
+	descriptorHeapDesc.Type = heapType; // ヒープタイプ
+	descriptorHeapDesc.NumDescriptors = numDescriptors;
+	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	HRESULT hr = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
+	assert(SUCCEEDED(hr));
+
+	return descriptorHeap;
+}
 
 /// --- メイン処理 ---
 // windowsアプリでのエントリーポイント(main関数)
@@ -420,13 +446,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(hr));
 
 	/// --- DescriptorHeapの生成 ---
-	// ディスクリプタヒープの生成
-	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;
-	D3D12_DESCRIPTOR_HEAP_DESC rtvDescriptorHeapDesc{};
-	rtvDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; // レンダーターゲットビュー用
-	rtvDescriptorHeapDesc.NumDescriptors = 2; // ダブルバッファように2つ、多くても別に構わない
-	hr = device->CreateDescriptorHeap(&rtvDescriptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
-	assert(SUCCEEDED(hr));
+	// RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
+	ID3D12DescriptorHeap* rtvDescriptorHeap = CreateDesdcriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+	// SRV用のヒープでディスクリプタの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
+	ID3D12DescriptorHeap* srvDescriptorHeap = CreateDesdcriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
 	/// --- SwapChainからResourceを引っ張ってくる ---
 	ID3D12Resource* swapChainResources[2] = {nullptr};
@@ -641,7 +664,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	Matrix4x4 projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 
-	
+	/// --- ImGuiの初期化 ---
+#ifdef USE_IMGUI
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplDX12_Init(device, swapChainDesc.BufferCount, rtvDesc.Format, srvDescriptorHeap, srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	ImGuiIO& io = ImGui::GetIO();
+	io.Fonts->Build();
+#endif // USE_IMGUI
 
 	/// --- メインループ ---
 	// ウィンドウのxボタンが押されるまでループ
@@ -651,6 +683,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+			/// --- ImGui先頭 ---
+#ifdef USE_IMGUI
+			ImGui_ImplDX12_NewFrame();
+			ImGui_ImplWin32_NewFrame();
+			ImGui::NewFrame();
+#endif // USE_IMGUI
+
 			/// ---ゲームの処理---
 			// 回転角を更新
 			transform.rotate.y += 0.003f;
@@ -664,6 +703,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// wvp行列をGPUに送る
 			*wvpData = worldViewProjectionMatrix;
 
+			/// --- ImGui中身 ---
+#ifdef USE_IMGUI
+			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
+			ImGui::ShowDemoWindow();
+#endif // USE_IMGUI
+
+			/// --- ImGui終わり ---
+#ifdef USE_IMGUI
+			// 内部コマンドを生成する
+			ImGui::Render();
+#endif // USE_IMGUI
+			
 #pragma region
 			/// --- コマンドを積む ---
 			// これから書き込むバックバッファのインデックスを取得
@@ -690,6 +741,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f}; // 青っぽい色。RGBAの順
 			commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
 
+			// 描画用のDescriptorHeapの設定
+			ID3D12DescriptorHeap* descriptorHeaps[] = {srvDescriptorHeap};
+			commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
 			// 描画の設定(ドローコール)
 			// ViewportとScissorRectの設定
 			commandList->RSSetViewports(1, &viewport);
@@ -713,8 +768,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 今回はRenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+
+			// 実際のcommandListのImGuiの描画コマンドを積む
+#ifdef USE_IMGUI
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 			// TransitionBarrerを張る
 			commandList->ResourceBarrier(1, &barrier);
+#endif // USE_IMGUI
 
 			// コマンドリストの内容を確定させる。すべてのコマンドを積んでからCloseすること
 			hr = commandList->Close();
@@ -748,12 +808,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			assert(SUCCEEDED(hr));
 #pragma endregion コマンドを積む処理
 		}
-	}
+	} // whileの終わり
+
+	/// --- ImGui終了処理 ---
+#ifdef USE_IMGUI
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+#endif // USE_IMGUI
 
 	/// --- 解放処理 ---
 	CloseHandle(fenceEvent);
 	fence->Release();
 	rtvDescriptorHeap->Release();
+	srvDescriptorHeap->Release();
 	swapChainResources[0]->Release();
 	swapChainResources[1]->Release();
 	swapChain->Release();
@@ -777,6 +845,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef _DEBUG
 	debugController->Release();
 #endif // _DEBUG
+	// DX12リソースがなくなった後にウィンドウを閉じる
 	CloseWindow(hwnd);
 
 	/// --- ReportLiveObjects ---
