@@ -864,7 +864,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::Begin("Window");
 
-			// 色変えれます
+			// 色変えられます
 			ImGui::ColorEdit4("Material Color", &materialData->x);
 
 			ImGui::End();
