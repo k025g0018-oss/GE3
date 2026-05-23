@@ -852,7 +852,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 
 			// ワールド、ビュー、プロジェクションを掛け合わせる
-			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
+			Matrix4x4 worldViewMatrix = Matrix4x4::Multiply(worldMatrix, viewMatrix);
+			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldViewMatrix, projectionMatrix);
 
 			// wvp行列をGPUに送る
 			*wvpData = worldViewProjectionMatrix;
