@@ -66,7 +66,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-
 // 文字列変換用
 // ConvertString
 std::wstring ConvertString(const std::string& str) {
