@@ -804,23 +804,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	VertexData pyramidVertices[12] = {
 		// 前面
 		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左下
-		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
-		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 右下
+		{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 右下
 
 		// 右側面
-		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 右下
-		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
-		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
+		{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 右下
+		{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
 
 		// 左側面
-		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f}}, // 奥
-		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, // 奥
+		{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
 		{{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 左下
 
 		// 底面
 		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左前
-		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, // 右前
-		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
+		{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, // 右前
+		{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
 	};
 
 	// データをGPUリソースへ書き込む(for文でコピー)
@@ -935,12 +935,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	MSG msg{};
 
 	/// ---変数の宣言---
+	/// 三角形
 	// Transformの変数を作る
 	Transform transform = {
 		{1.0f, 1.0f, 1.0f},
 		{0.0f, 0.0f, 0.0f},
 		{0.0f, 0.0f, 0.0f}
 	};
+
+	// カメラの回転
+	bool isAutoRotate = false;
 
 	Transform cameraTransform{
 		{1.0f, 1.0f, 1.0f},
@@ -984,8 +988,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- ゲームの処理 ---
 			// 回転角を更新
-			transform.rotate.y += 0.003f;
-			transform.rotate.x += 0.002f;
+			if (isAutoRotate) {
+				transform.rotate.y += 0.003f;
+				transform.rotate.x += 0.002f;
+			}
 
 			/// --- 行列の計算 ---
 			// ワールド行列の更新
@@ -1013,8 +1019,52 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::Begin("Window");
 
-			// 色変えれます
+			/// --- 色変えれます ---
+			ImGui::Text("Color Control");
 			ImGui::ColorEdit4("Material Color", &materialData->x);
+
+			// 区切り線
+			ImGui::Separator();
+
+			/// --- 自動で回転かと座標変えれます ---
+			ImGui::Text("Pyramid Control");
+
+			// 1_拡縮の変更(XYZ)
+			ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
+
+			// 2_上下左右・奥への位置移動(XYZ)
+			ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
+
+			// 3_自動回転の切り替えボタン
+			// ボタンを押すたびにON/OFFが切り替わり、OFFになった瞬間に回転を初期値(0)にリセット
+			if (ImGui::Button(isAutoRotate ? "Stop & Reset" : "Start Auto Rotate")) {
+				isAutoRotate = !isAutoRotate;
+				if (!isAutoRotate) {
+					transform.rotate = {0.0f, 0.0f, 0.0f}; // 回転を初期値に戻す
+				}
+			}
+
+			// 4_フラグの状態確認(0か1かで表示)
+			ImGui::Text("Auto Rotate Flag: %d", isAutoRotate ? 1 : 0);
+
+			// 5_各軸の回転(XYZ)
+			// 自動回転がOFFのときだけ手動でいじれるようにしてONのときは現在の回転角を表示する
+			if (!isAutoRotate) {
+				ImGui::SliderFloat3("Rotation", &transform.rotate.x, -3.1415f, 3.1415f);
+			} else {
+				ImGui::Text("Rotation (Auto): X:%.2f, Y:%.2f, Z:%.2f", transform.rotate.x, transform.rotate.y, transform.rotate.z);
+			}
+
+			// 6_すべてのパラメータをリセット (SRTと自動回転を初期値に戻す)
+			if (ImGui::Button("Reset All")) {
+				transform.scale = {1.0f, 1.0f, 1.0f};
+				transform.rotate = {0.0f, 0.0f, 0.0f};
+				transform.translate = {0.0f, 0.0f, 0.0f};
+				isAutoRotate = false; // 自動回転も停止状態にする
+			}
+
+			// 区切り線
+			ImGui::Separator();
 
 			ImGui::End();
 #endif // USE_IMGUI
