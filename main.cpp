@@ -755,7 +755,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/// VertexResourceを生成する
 	// 頂点数の数
-	const uint32_t kVertexCount = 6;
+	// 頂点数の数(三角錐は4面 * 3頂点 = 12)
+	const uint32_t kVertexCount = 36;
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);
 
 	/// Material用のリソースを作る
@@ -773,6 +774,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
+	/*
 	/// 三角形1個目
 	// 左下
 	vertexData[0].position = {-0.5f, -0.5f, 0.0f, 1.0f};
@@ -783,7 +785,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 右下
 	vertexData[2].position = {0.5f, -0.5f, 0.0f, 1.0f};
 	vertexData[2].texcoord = {1.0f, 1.0f};
+	*/
 
+	/*
 	/// 三角形2個目
 	// 左下
 	vertexData[3].position = {-0.5f, -0.5f, 0.5f, 1.0f};
@@ -794,6 +798,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 右下
 	vertexData[5].position = {0.5f, -0.5f, -0.5f, 1.0f};
 	vertexData[5].texcoord = {1.0f, 1.0f};
+	*/
+
+	// 三角錐を構成する
+	VertexData pyramidVertices[12] = {
+		// 前面
+		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左下
+		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 右下
+
+		// 右側面
+		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 右下
+		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
+
+		// 左側面
+		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f}}, // 奥
+		{{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, // 頂点
+		{{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 左下
+
+		// 底面
+		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左前
+		{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, // 右前
+		{{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
+	};
+
+	// データをGPUリソースへ書き込む(for文でコピー)
+	for (uint32_t i = 0; i < kVertexCount; ++i) {
+		vertexData[i] = pyramidVertices[i];
+	}
 
 	/// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -952,6 +985,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- ゲームの処理 ---
 			// 回転角を更新
 			transform.rotate.y += 0.003f;
+			transform.rotate.x += 0.002f;
 
 			/// --- 行列の計算 ---
 			// ワールド行列の更新
