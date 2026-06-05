@@ -1020,6 +1020,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			// --- モードに応じた頂点データの書き込み ---
+			uint32_t drawVertexCount = 3; // デフォルト
+
 			if (displayMode == 0) {
 				// 0: 三角形1枚
 				drawVertexCount = 3;
@@ -1034,59 +1036,84 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			} else if (displayMode == 1) {
 				// 1: 三角形2枚 (個別SRT)
 				drawVertexCount = 6;
-				VertexData baseTriangle[3] = {
-					{{ 0.0f,  0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
-					{{ 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 右下
-					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // 左下
-				};
+				// 三角形1個目
+				vertexData[0].position = {-0.5f, -0.5f, 0.0f, 1.0f};
+				vertexData[0].texcoord = {0.0f, 1.0f};
+				vertexData[1].position = {0.0f, 0.5f, 0.0f, 1.0f};
+				vertexData[1].texcoord = {0.5f, 0.0f};
+				vertexData[2].position = {0.5f, -0.5f, 0.0f, 1.0f};
+				vertexData[2].texcoord = {1.0f, 1.0f};
+
+				// 三角形2個目
+				vertexData[3].position = {-0.5f, -0.5f, 0.5f, 1.0f};
+				vertexData[3].texcoord = {0.0f, 1.0f};
+				vertexData[4].position = {0.0f, 0.0f, 0.0f, 1.0f};
+				vertexData[4].texcoord = {0.5f, 0.0f};
+				vertexData[5].position = {0.5f, -0.5f, -0.5f, 1.0f};
+				vertexData[5].texcoord = {1.0f, 1.0f};
 
 				// 1枚目の三角形の変形計算
 				for (uint32_t i = 0; i < 3; ++i) {
-					VertexData v = baseTriangle[i];
+					VertexData v = vertexData[i]; 
+
 					float x = v.position.x * t1_Scale[0];
 					float y = v.position.y * t1_Scale[1];
 					float z = v.position.z * t1_Scale[2];
+
 					// X軸回転
 					float cosX = cosf(t1_Rotate[0]); float sinX = sinf(t1_Rotate[0]);
 					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
 					y = dy; z = dz;
+
 					// Y軸回転
 					float cosY = cosf(t1_Rotate[1]); float sinY = sinf(t1_Rotate[1]);
 					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
 					x = dx; z = dz;
+
 					// Z軸回転
 					float cosZ = cosf(t1_Rotate[2]); float sinZ = sinf(t1_Rotate[2]);
 					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
 					x = dx; y = dy;
+
 					// 平行移動
 					v.position.x = x + t1_Translate[0];
 					v.position.y = y + t1_Translate[1];
 					v.position.z = z + t1_Translate[2];
+
+					// 計算結果を上書き保存
 					vertexData[i] = v;
 				}
 
 				// 2枚目の三角形の変形計算
 				for (uint32_t i = 0; i < 3; ++i) {
-					VertexData v = baseTriangle[i];
+					// インデックスを「i + 3」にする
+					VertexData v = vertexData[i + 3]; 
+
 					float x = v.position.x * t2_Scale[0];
 					float y = v.position.y * t2_Scale[1];
 					float z = v.position.z * t2_Scale[2];
+
 					// X軸回転
 					float cosX = cosf(t2_Rotate[0]); float sinX = sinf(t2_Rotate[0]);
 					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
 					y = dy; z = dz;
+
 					// Y軸回転
 					float cosY = cosf(t2_Rotate[1]); float sinY = sinf(t2_Rotate[1]);
 					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
 					x = dx; z = dz;
+
 					// Z軸回転
 					float cosZ = cosf(t2_Rotate[2]); float sinZ = sinf(t2_Rotate[2]);
 					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
 					x = dx; y = dy;
+
 					// 平行移動
 					v.position.x = x + t2_Translate[0];
 					v.position.y = y + t2_Translate[1];
 					v.position.z = z + t2_Translate[2];
+
+					// 計算結果を上書き保存
 					vertexData[i + 3] = v;
 				}
 			} else if (displayMode == 2) {
