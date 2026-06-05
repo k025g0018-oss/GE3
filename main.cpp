@@ -17,6 +17,8 @@
 #include <vector>
 #include "externals/DirectXTex/DirectXTex.h"
 #include "externals/DirectXTex/d3dx12.h"
+#include "Collision.h"
+#include <random>
 
 // ImGui
 #ifdef USE_IMGUI
@@ -364,6 +366,42 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 
 	return resource;
 }
+
+// 生成される三角形
+struct TriangleObject {
+	Vector3 position;
+	Vector3 velocity;
+
+	float scaleX;
+	float scaleY;
+
+	void Initialize(float minRange, float maxRange) {
+
+		std::random_device rd;
+		std::mt19937 gen(rd());
+
+		std::uniform_real_distribution<float> posDist(minRange, maxRange);
+		std::uniform_real_distribution<float> velDist(-0.03f, 0.03f);
+
+		std::uniform_real_distribution<float> scaleXDist(0.1f, 0.6f);
+		std::uniform_real_distribution<float> scaleYDist(0.1f, 0.8f);
+
+		position = {
+			posDist(gen),
+			posDist(gen),
+			0.0f
+		};
+
+		velocity = {
+			velDist(gen),
+			velDist(gen),
+			0.0f
+		};
+
+		scaleX = scaleXDist(gen);
+		scaleY = scaleYDist(gen);
+	}
+};
 
 #pragma endregion 関数の定義エリア
 
@@ -823,6 +861,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
 	};
 
+
+
 	// データをGPUリソースへ書き込む(for文でコピー)
 	for (uint32_t i = 0; i < 12; ++i) {
 		vertexData[i] = pyramidVertices[i];
@@ -848,8 +888,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(fenceEvent != nullptr);
 
 	/// --- Textureの読み込みと転送 ---
+	// テクスチャの切り替え用
+	int textureMode = 1;
+
+	// 猫画像
+	uint32_t genbanekoTextureIndex = 0;
+
 	// Textureを読んで転送する
 	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	//DirectX::ScratchImage mipImages = LoadTexture("genbaneko.png");
+
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 
 	// VRAM上にテクスチャリソースを作成
@@ -953,23 +1001,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	uint32_t drawVertexCount = 12;
 
 	// モード1で使う
-	float t1_Scale[3] = { 1.0f, 1.0f, 1.0f };
-	float t1_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float t1_Translate[3] = { 0.0f, 0.0f, 0.0f };
+	float t1_Scale[3] = {1.0f, 1.0f, 1.0f};
+	float t1_Rotate[3] = {0.0f, 0.0f, 0.0f};
+	float t1_Translate[3] = {0.0f, 0.0f, 0.0f};
 
-	float t2_Scale[3] = { 1.0f, 1.0f, 1.0f };
-	float t2_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float t2_Translate[3] = { 0.0f, 0.0f, 0.0f };
+	float t2_Scale[3] = {1.0f, 1.0f, 1.0f};
+	float t2_Rotate[3] = {0.0f, 0.0f, 0.0f};
+	float t2_Translate[3] = {0.0f, 0.0f, 0.0f};
 
 	// モード3で使う
 	// 三角錐1個目
-	float p1_Scale[3] = { 1.0f, 1.0f, 1.0f };
-	float p1_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float p1_Translate[3] = { -0.3f, 0.0f, 0.0f };
+	float p1_Scale[3] = {1.0f, 1.0f, 1.0f};
+	float p1_Rotate[3] = {0.0f, 0.0f, 0.0f};
+	float p1_Translate[3] = {-0.3f, 0.0f, 0.0f};
 	// 三角錐2個目
-	float p2_Scale[3] = { 1.0f, 1.0f, 1.0f };
-	float p2_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float p2_Translate[3] = { 0.3f, 0.0f, 0.0f };
+	float p2_Scale[3] = {1.0f, 1.0f, 1.0f};
+	float p2_Rotate[3] = {0.0f, 0.0f, 0.0f};
+	float p2_Translate[3] = {0.3f, 0.0f, 0.0f};
+
+	// 三角形の管理用ベクトル
+	std::vector<TriangleObject> triangles;
+
+	// 演出モード4用の初期設定
+	// 画面端
+	const float kFieldMin = -0.9f;
+	const float kFieldMax = 0.9f;
 
 	/// カメラ
 	Transform cameraTransform{
@@ -1026,8 +1082,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 0: 三角形1枚
 				drawVertexCount = 3;
 				VertexData triangleVertices[3] = {
-					{{ 0.0f,  0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
-					{{ 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 右下
+					{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
+					{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 右下
 					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // 左下
 				};
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
@@ -1054,7 +1110,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				// 1枚目の三角形の変形計算
 				for (uint32_t i = 0; i < 3; ++i) {
-					VertexData v = vertexData[i]; 
+					VertexData v = vertexData[i];
 
 					float x = v.position.x * t1_Scale[0];
 					float y = v.position.y * t1_Scale[1];
@@ -1087,7 +1143,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 2枚目の三角形の変形計算
 				for (uint32_t i = 0; i < 3; ++i) {
 					// インデックスを「i + 3」にする
-					VertexData v = vertexData[i + 3]; 
+					VertexData v = vertexData[i + 3];
 
 					float x = v.position.x * t2_Scale[0];
 					float y = v.position.y * t2_Scale[1];
@@ -1120,10 +1176,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 2: 三角錐1個
 				drawVertexCount = 12;
 				VertexData pyramidVertices[12] = {
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {1.0f, 1.0f}}, {{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{ 0.0f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
 				};
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
 					vertexData[i] = pyramidVertices[i];
@@ -1132,10 +1188,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 3: 三角錐2個 (個別SRT)
 				drawVertexCount = 24;
 				VertexData basePyramid[12] = {
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, {{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{ 0.0f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.0f,  0.5f,  0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{ 0.0f, -0.5f,  0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
 				};
 
 				// 1個目の三角錐の変形計算
@@ -1189,14 +1245,63 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				}
 			} else if (displayMode == 4) {
 				// 4: 演出モード
-				drawVertexCount = 3;
-				VertexData productionVertices[3] = {
-					{{ 0.0f,  0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
-					{{ 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 右下
-					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // 左下
+
+				VertexData triangleVertices[3] = {
+					{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
+					{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 				};
-				for (uint32_t i = 0; i < drawVertexCount; ++i) {
-					vertexData[i] = productionVertices[i];
+
+				memcpy(vertexData, triangleVertices, sizeof(triangleVertices));
+
+				// 予約用の箱
+				std::vector<TriangleObject> newTriangles;
+
+				// 1_ 各三角形の移動と反射処理
+				for (size_t i = 0; i < triangles.size(); ++i) {
+
+					TriangleObject& tri = triangles[i];
+
+					tri.position.x += tri.velocity.x;
+					tri.position.y += tri.velocity.y;
+
+					bool collided = false;
+
+					if (tri.position.x < kFieldMin || tri.position.x > kFieldMax) {
+						tri.velocity.x *= -1.0f;
+						collided = true;
+					}
+
+					if (tri.position.y < kFieldMin || tri.position.y > kFieldMax) {
+						tri.velocity.y *= -1.0f;
+						collided = true;
+					}
+
+					// 2_ 壁に当たったら増殖
+					if (collided && triangles.size() + newTriangles.size() < 50) {
+
+						TriangleObject nextTri;
+						nextTri.Initialize(kFieldMin, kFieldMax);
+
+						newTriangles.push_back(nextTri);
+					}
+				}
+
+				triangles.insert(
+					triangles.end(),
+					newTriangles.begin(),
+					newTriangles.end()
+				);
+
+				// 3_ 50個を超えたらリセット
+				if (triangles.size() >= 50) {
+
+					triangles.clear();
+
+					TriangleObject firstTri;
+					firstTri.Initialize(kFieldMin, kFieldMax);
+
+					triangles.push_back(firstTri);
 				}
 			}
 
@@ -1233,13 +1338,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 区切り線
 			ImGui::Separator();
 
+			/// --- 画像変えれます ---
+			// テクスチャ切り替え
+			const char* textureModes[] = {
+				"0 : No Texture",
+				"1 : UV Checker",
+				"2 : Genbaneko"
+			};
+
+			ImGui::Combo(
+				"Texture Mode",
+				&textureMode,
+				textureModes,
+				IM_ARRAYSIZE(textureModes)
+			);
+
+			// 区切り線
+			ImGui::Separator();
+
 			/// --- モード切り替えを切り替えだドン ---
-			const char* modes[] = { 
-				"0: Single Triangle", 
-				"1: Double Triangles", 
-				"2: Single Pyramid", 
-				"3: Double Pyramids (Individual SRT)", 
-				"4: Production Mode" 
+			const char* modes[] = {
+				"0: Single Triangle",
+				"1: Double Triangles",
+				"2: Single Pyramid",
+				"3: Double Pyramids (Individual SRT)",
+				"4: Production Mode"
 			};
 			ImGui::Combo("Display Mode", &displayMode, modes, IM_ARRAYSIZE(modes));
 
@@ -1331,10 +1454,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// モード3の初期位置
 				p1_Translate[0] = -0.3f; p1_Translate[1] = 0.0f;  p1_Translate[2] = 0.0f;
 				p2_Translate[0] = 0.3f;  p2_Translate[1] = 0.0f;  p2_Translate[2] = 0.0f;
+
+				// 全削除
+				triangles.clear();
+
+				// 最初の1つだけ生成
+				TriangleObject firstTri;
+				firstTri.Initialize(kFieldMin, kFieldMax);
+				triangles.push_back(firstTri);
 			}
 
 			// 区切り線
 			ImGui::Separator();
+
+			if (displayMode == 4) {
+				ImGui::Text("Triangle Count : %d",
+					(int)triangles.size());
+			}
+
+			if (!triangles.empty()) {
+				ImGui::Text(
+					"Pos X: %.3f Y: %.3f",
+					triangles[0].position.x,
+					triangles[0].position.y
+				);
+			}
 
 			ImGui::End();
 #endif // USE_IMGUI
@@ -1393,8 +1537,77 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// wvp用のBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+
+			// 画像を指定
+			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle{};
+
 			// SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+
+			// 1_モード4は全三角形描画
+			if (displayMode == 4) {
+				for (size_t i = 0; i < triangles.size(); i++) {
+					TriangleObject& tri = triangles[i];
+
+					Transform triTransform{};
+
+					triTransform.scale = {
+						tri.scaleX,
+						tri.scaleY,
+						1.0f
+					};
+
+					triTransform.rotate = {
+						0.0f,
+						0.0f,
+						0.0f
+					};
+
+					triTransform.translate = {
+						tri.position.x,
+						tri.position.y,
+						0.0f
+					};
+
+					Matrix4x4 triWorld =
+						Matrix4x4::MakeAffineMatrix(
+							triTransform.scale,
+							triTransform.rotate,
+							triTransform.translate
+						);
+
+					Matrix4x4 triWvp =
+						Matrix4x4::Multiply(
+							triWorld,
+							Matrix4x4::Multiply(
+							viewMatrix,
+							projectionMatrix
+						)
+						);
+
+					*wvpData = triWvp;
+
+					commandList->DrawInstanced(
+						drawVertexCount,
+						1,
+						0,
+						0
+					);
+				}
+			}
+
+			// 2_それ以外のモード
+			else {
+				*wvpData = worldViewProjectionMatrix;
+
+				commandList->DrawInstanced(
+					drawVertexCount,
+					1,
+					0,
+					0
+				);
+			}
+
 			// 描画(DrawCall/ドローコール)、3頂点で1つのインスタンス
 			commandList->DrawInstanced(drawVertexCount, 1, 0, 0);
 
