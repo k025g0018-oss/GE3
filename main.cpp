@@ -955,11 +955,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// モード1で使う
 	float t1_Scale[3] = { 1.0f, 1.0f, 1.0f };
 	float t1_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float t1_Translate[3] = { -0.2f, -0.2f, 0.0f };
+	float t1_Translate[3] = { 0.0f, 0.0f, 0.0f };
 
 	float t2_Scale[3] = { 1.0f, 1.0f, 1.0f };
 	float t2_Rotate[3] = { 0.0f, 0.0f, 0.0f };
-	float t2_Translate[3] = { 0.2f, 0.2f, 0.2f };
+	float t2_Translate[3] = { 0.0f, 0.0f, 0.0f };
 
 	// モード3で使う
 	// 三角錐1個目
@@ -1015,8 +1015,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- ゲームの処理 ---
 			// 回転角を更新
 			if (isAutoRotate) {
-				transform.rotate.y += 0.003f;
-				transform.rotate.x += 0.002f;
+				transform.rotate.y += 0.005f;
+				//transform.rotate.x += 0.002f;
 			}
 
 			// --- モードに応じた頂点データの書き込み ---
