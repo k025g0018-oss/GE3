@@ -818,6 +818,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	vertexDataSprite[5].position = {640.0f, 360.0f, 0.0f, 1.0f}; // 右下
 	vertexDataSprite[5].texcoord = {1.0f, 1.0f};
 
+	// スプライト用のTransformationMatrix用のリソースを作る、Matrix4x4 1つ分のサイズを用意
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	// 定数バッファのデータを書き込むためのポインタ
+	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	// リソースをマップする
+	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	// 単位行列を書き込んでおく
+	*transformationMatrixDataSprite = Matrix4x4::MakeIdentity4x4();
+
 	/// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	// リソースの戦闘のアドレスから使う
@@ -948,6 +957,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{0.0f, 0.0f, -5.0f}
 	};
 
+	// CPUで動かす用のTransformを作る
+	Transform transformSprite = {
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+
 	Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
 	Matrix4x4 cameraMatrix = Matrix4x4::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
@@ -1005,6 +1021,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// wvp行列をGPUに送る
 			*wvpData = worldViewProjectionMatrix;
 
+			// Sprite用のWorldViewProjectionMatrixを作る
+			Matrix4x4 worldMatrixSprite =
+				Matrix4x4::MakeAffineMatrix(
+					transformSprite.scale,
+					transformSprite.rotate,
+					transformSprite.translate
+				);
+
+			Matrix4x4 viewMatrixSprite =
+				Matrix4x4::MakeIdentity4x4();
+
+			Matrix4x4 projectionMatrixSprite =
+				Matrix4x4::MakeOrthographicMatrix(
+					0.0f,
+					0.0f,
+					float(kClientWidth),
+					float(kClientHeight),
+					0.0f,
+					100.0f
+				);
+
+			Matrix4x4 worldViewProjectionMatrixSprite =
+				Matrix4x4::Multiply(
+					worldMatrixSprite,
+					Matrix4x4::Multiply(
+					viewMatrixSprite,
+					projectionMatrixSprite
+				)
+				);
+
+			*transformationMatrixDataSprite =
+				worldViewProjectionMatrixSprite;
+
 			/// --- ImGui中身 ---
 #ifdef USE_IMGUI
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
@@ -1015,6 +1064,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 色変えれます
 			ImGui::ColorEdit4("Material Color", &materialData->x);
 
+			ImGui::DragFloat3(
+				"Scale",
+				&transformSprite.scale.x,
+				0.01f
+			);
+
+			ImGui::DragFloat3(
+				"Rotate",
+				&transformSprite.rotate.x,
+				0.01f
+			);
+
+			ImGui::DragFloat3(
+				"Translate",
+				&transformSprite.translate.x,
+				1.0f
+			);
+
 			ImGui::End();
 #endif // USE_IMGUI
 
@@ -1024,8 +1091,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::Render();
 #endif // USE_IMGUI
 
-#pragma region
 			/// --- コマンドを積む ---
+#pragma region
 			// これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -1076,6 +1143,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			// 描画(DrawCall/ドローコール)、3頂点で1つのインスタンス
 			commandList->DrawInstanced(kVertexCount, 1, 0, 0);
+
+			/// --- Sprite描画 ---
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+
+			commandList->SetGraphicsRootConstantBufferView(
+				1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+
+			commandList->DrawInstanced(6, 1, 0, 0);
 
 			// 画面表示できるようにする
 			// 今回はRenderTargetからPresentにする
@@ -1134,6 +1209,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 1_各種バッファ・テクスチャ・リソース（すべてdeviceより前）
 	vertexResource->Release();
 	vertexResourceSprite->Release();
+	transformationMatrixResourceSprite->Release();
 	wvpResource->Release();
 	materialResource->Release();
 	textureResource->Release();
@@ -1156,21 +1232,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	commandAllocator->Release();
 	commandQueue->Release();
 
-	// 4. ディスクリプタヒープ
+	// 4_ディスクリプタヒープ
 	rtvDescriptorHeap->Release();
 	srvDescriptorHeap->Release();
 	dsvDescriptorHeap->Release();
 
-	// 5. スワップチェーンとバックバッファリソース
+	// 5_スワップチェーンとバックバッファリソース
 	swapChainResources[0]->Release();
 	swapChainResources[1]->Release();
 	swapChain->Release();
 
-	// 6. フェンスとイベント
+	// 6_フェンスとイベント
 	CloseHandle(fenceEvent);
 	fence->Release();
 
-	// 7. DXC関連のツール
+	// 7_DXC関連のツール
 	includeHandler->Release();
 	dxcCompiler->Release();
 	dxcUtils->Release();
