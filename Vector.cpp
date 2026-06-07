@@ -5,17 +5,17 @@
 /// ---Vector3---
 // 加算
 Vector3 Vector3::operator+(const Vector3& obj) const {
-    return { x + obj.x, y + obj.y, z + obj.z };
+	return { x + obj.x, y + obj.y, z + obj.z };
 }
 
 // 減算
 Vector3 Vector3::operator-(const Vector3& obj) const {
-    return { x - obj.x, y - obj.y, z - obj.z };
+	return { x - obj.x, y - obj.y, z - obj.z };
 }
 
 // スカラー倍
 Vector3 Vector3::operator*(float scalar) const {
-    return { x * scalar, y * scalar, z * scalar };
+	return { x * scalar, y * scalar, z * scalar };
 }
 
 // 座標変換
