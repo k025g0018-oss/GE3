@@ -14,17 +14,16 @@
 #include <dxcapi.h>
 #include "Matrix4x4.h"
 #include "Vector.h"
-#include <vector>
 #include "BufferResource.h"
 #include "Collision.h"
 #include "CommandContext.h"
 #include "DepthStencilView.h"
 #include "DescriptorHeap.h"
 #include "Logger.h"
+#include "ParticleSystem.h"
 #include "PipelineState.h"
 #include "TextureManager.h"
 #include "VertexBuffer.h"
-#include <random>
 
 // ImGui
 #ifdef USE_IMGUI
@@ -91,42 +90,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	// 他に関連付けられているSEH例外ハンドラがあれば実行。通常はプロセスを終了する。
 	return EXCEPTION_EXECUTE_HANDLER;
 }
-
-// 生成される三角形
-struct TriangleObject {
-	Vector3 position;
-	Vector3 velocity;
-
-	float scaleX;
-	float scaleY;
-
-	void Initialize(float minRange, float maxRange) {
-
-		std::random_device rd;
-		std::mt19937 gen(rd());
-
-		std::uniform_real_distribution<float> posDist(minRange, maxRange);
-		std::uniform_real_distribution<float> velDist(-0.03f, 0.03f);
-
-		std::uniform_real_distribution<float> scaleXDist(0.1f, 0.6f);
-		std::uniform_real_distribution<float> scaleYDist(0.1f, 0.8f);
-
-		position = {
-			posDist(gen),
-			posDist(gen),
-			0.0f
-		};
-
-		velocity = {
-			velDist(gen),
-			velDist(gen),
-			0.0f
-		};
-
-		scaleX = scaleXDist(gen);
-		scaleY = scaleYDist(gen);
-	}
-};
 
 #pragma endregion 関数の定義エリア
 
@@ -528,9 +491,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 描画モード
 	int displayMode = 1;
 
-	// 今フレーム描画する頂点数
-	uint32_t drawVertexCount = 12;
-
 	// モード1で使う
 	float t1_Scale[3] = {1.0f, 1.0f, 1.0f};
 	float t1_Rotate[3] = {0.0f, 0.0f, 0.0f};
@@ -550,13 +510,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	float p2_Rotate[3] = {0.0f, 0.0f, 0.0f};
 	float p2_Translate[3] = {0.3f, 0.0f, 0.0f};
 
-	// 三角形の管理用ベクトル
-	std::vector<TriangleObject> triangles;
+	///// ----- ParticleSystem ----- /////
 
-	// 演出モード4用の初期設定
-	// 画面端
-	const float kFieldMin = -0.9f;
-	const float kFieldMax = 0.9f;
+	/// --- 初期化 ---
+	// 演出モード4で使用する範囲と最大数を設定する
+	ParticleSystem particleSystem;
+	particleSystem.Initialize(device, -0.9f, 0.9f, 50);
 
 	/// カメラ
 	Transform cameraTransform{
@@ -607,9 +566,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			// --- モードに応じた頂点データの書き込み ---
+			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
+			const int renderingMode = displayMode;
 			uint32_t drawVertexCount = 3; // デフォルト
 
-			if (displayMode == 0) {
+			if (renderingMode == 0) {
 				// 0: 三角形1枚
 				drawVertexCount = 3;
 				VertexData triangleVertices[3] = {
@@ -620,7 +581,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
 					vertexData[i] = triangleVertices[i];
 				}
-			} else if (displayMode == 1) {
+			} else if (renderingMode == 1) {
 				// 1: 三角形2枚 (個別SRT)
 				drawVertexCount = 6;
 				// 三角形1個目
@@ -703,7 +664,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					// 計算結果を上書き保存
 					vertexData[i + 3] = v;
 				}
-			} else if (displayMode == 2) {
+			} else if (renderingMode == 2) {
 				// 2: 三角錐1個
 				drawVertexCount = 12;
 				VertexData pyramidVertices[12] = {
@@ -715,7 +676,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
 					vertexData[i] = pyramidVertices[i];
 				}
-			} else if (displayMode == 3) {
+			} else if (renderingMode == 3) {
 				// 3: 三角錐2個 (個別SRT)
 				drawVertexCount = 24;
 				VertexData basePyramid[12] = {
@@ -774,66 +735,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					v.position.z = z + p2_Translate[2];
 					vertexData[i + 12] = v;
 				}
-			} else if (displayMode == 4) {
+			} else if (renderingMode == 4) {
 				// 4: 演出モード
 
-				VertexData triangleVertices[3] = {
-					{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
-					{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-				};
+				// Particle用の三角形をVertexBufferへ書き込む
+				particleSystem.WriteTriangleVertices(vertexData);
 
-				memcpy(vertexData, triangleVertices, sizeof(triangleVertices));
-
-				// 予約用の箱
-				std::vector<TriangleObject> newTriangles;
-
-				// 1_ 各三角形の移動と反射処理
-				for (size_t i = 0; i < triangles.size(); ++i) {
-
-					TriangleObject& tri = triangles[i];
-
-					tri.position.x += tri.velocity.x;
-					tri.position.y += tri.velocity.y;
-
-					bool collided = false;
-
-					if (tri.position.x < kFieldMin || tri.position.x > kFieldMax) {
-						tri.velocity.x *= -1.0f;
-						collided = true;
-					}
-
-					if (tri.position.y < kFieldMin || tri.position.y > kFieldMax) {
-						tri.velocity.y *= -1.0f;
-						collided = true;
-					}
-
-					// 2_ 壁に当たったら増殖
-					if (collided && triangles.size() + newTriangles.size() < 50) {
-
-						TriangleObject nextTri;
-						nextTri.Initialize(kFieldMin, kFieldMax);
-
-						newTriangles.push_back(nextTri);
-					}
-				}
-
-				triangles.insert(
-					triangles.end(),
-					newTriangles.begin(),
-					newTriangles.end()
-				);
-
-				// 3_ 50個を超えたらリセット
-				if (triangles.size() >= 50) {
-
-					triangles.clear();
-
-					TriangleObject firstTri;
-					firstTri.Initialize(kFieldMin, kFieldMax);
-
-					triangles.push_back(firstTri);
-				}
+				// 移動、回転、壁反射、Particleの追加を行う
+				particleSystem.Update();
 			}
 
 			/// --- 行列の計算 ---
@@ -986,13 +895,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				p1_Translate[0] = -0.3f; p1_Translate[1] = 0.0f;  p1_Translate[2] = 0.0f;
 				p2_Translate[0] = 0.3f;  p2_Translate[1] = 0.0f;  p2_Translate[2] = 0.0f;
 
-				// 全削除
-				triangles.clear();
-
-				// 最初の1つだけ生成
-				TriangleObject firstTri;
-				firstTri.Initialize(kFieldMin, kFieldMax);
-				triangles.push_back(firstTri);
+				// 全Particleを削除して最初の1個を生成する
+				particleSystem.Reset();
 			}
 
 			// 区切り線
@@ -1000,14 +904,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			if (displayMode == 4) {
 				ImGui::Text("Triangle Count : %d",
-					(int)triangles.size());
+					static_cast<int>(particleSystem.GetParticleCount()));
+				ImGui::Text("Total Vertex Count : %d",
+					static_cast<int>(particleSystem.GetTotalVertexCount()));
 			}
 
-			if (!triangles.empty()) {
+			const ParticleSystem::Particle* firstParticle = particleSystem.GetFirstParticle();
+			if (firstParticle != nullptr) {
 				ImGui::Text(
 					"Pos X: %.3f Y: %.3f",
-					triangles[0].position.x,
-					triangles[0].position.y
+					firstParticle->position.x,
+					firstParticle->position.y
 				);
 			}
 
@@ -1081,55 +988,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			);
 
 			// 1_モード4は全三角形描画
-			if (displayMode == 4) {
-				for (size_t i = 0; i < triangles.size(); i++) {
-					TriangleObject& tri = triangles[i];
-
-					Transform triTransform{};
-
-					triTransform.scale = {
-						tri.scaleX,
-						tri.scaleY,
-						1.0f
-					};
-
-					triTransform.rotate = {
-						0.0f,
-						0.0f,
-						0.0f
-					};
-
-					triTransform.translate = {
-						tri.position.x,
-						tri.position.y,
-						0.0f
-					};
-
-					Matrix4x4 triWorld =
-						Matrix4x4::MakeAffineMatrix(
-							triTransform.scale,
-							triTransform.rotate,
-							triTransform.translate
-						);
-
-					Matrix4x4 triWvp =
-						Matrix4x4::Multiply(
-							triWorld,
-							Matrix4x4::Multiply(
-							viewMatrix,
-							projectionMatrix
-						)
-						);
-
-					*wvpData = triWvp;
-
-					commandList->DrawInstanced(
-						drawVertexCount,
-						1,
-						0,
-						0
-					);
-				}
+			if (renderingMode == 4) {
+				particleSystem.Draw(
+					commandList,
+					viewMatrix,
+					projectionMatrix
+				);
 			}
 
 			// 2_それ以外のモード
@@ -1144,9 +1008,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				);
 			}
 
-			// 描画(DrawCall/ドローコール)、3頂点で1つのインスタンス
-			commandList->DrawInstanced(drawVertexCount, 1, 0, 0);
-
 			// 画面表示できるようにする
 			// 今回はRenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -1155,9 +1016,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+#endif // USE_IMGUI
 			// TransitionBarrerを張る
 			commandList->ResourceBarrier(1, &barrier);
-#endif // USE_IMGUI
 
 			///// ----- CommandContext ----- /////
 
@@ -1178,6 +1039,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- 解放処理 ---
 	// 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前)
 	vertexBuffer.Finalize();
+	particleSystem.Finalize();
 	wvpResource->Release();
 	materialResource->Release();
 	// 読み込んだテクスチャをすべて解放する

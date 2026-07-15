@@ -38,6 +38,10 @@ main.cppには「何をどの順番で行うか」を残し、各クラスには
 ・DepthStencilView
   DepthStencilTextureとDSVを管理する。
 
+・ParticleSystem
+  Production Modeで使用する三角形の生成、移動、回転、壁反射、増殖、描画を管理する。
+  Particleごとに別のWVP領域を持ち、複数の三角形を別々の位置へ描画する。
+
 ・CommandContext
   CommandQueue、CommandAllocator、CommandList、Fenceを所有する。
   CPUがコマンドを記録し、GPUへ渡し、完了を待って次のフレームへ進む流れを管理する。
@@ -101,6 +105,7 @@ RootSignatureやShaderなどの設定は、描画中に毎回作らない。
 6_TextureごとのSRVを作る。
 7_DepthStencilTextureとDSVを作る。
 8_CommandContextで転送コマンドを実行する。
+9_ParticleSystemへ移動範囲、最大数、Particle用WVPResourceを設定する。
 
 /// --- 8_ImGui ---
 1_ImGui Contextを作る。
@@ -119,12 +124,23 @@ ImGui_ImplDX12_NewFrame、ImGui_ImplWin32_NewFrame、ImGui::NewFrameの順で開
 
 /// --- 3_Game Update ---
 1_ImGuiで選ばれたDisplayModeを確認する。
+現在のフレームで使うDisplayModeを保存し、頂点更新と描画で同じモードを使う。
 2_三角形、三角錐、演出モードに応じて頂点データを更新する。
 3_TransformからWorld行列を作る。
 4_CameraからView行列を作る。
 5_画角からProjection行列を作る。
 6_World、View、Projectionを掛けてWVPを作る。
 7_WVP用ConstantBufferへ計算結果を書く。
+
+Production Modeでは、ParticleSystemが次の順番で更新する。
+
+1_各Particleを速度に従って移動する。
+2_角速度に従って三角形を回転する。
+3_範囲外の壁に当たったら座標を範囲内へ戻して反射する。
+4_壁に当たったParticleの数だけ、ランダムなParticleを追加する。
+5_Particle数が最大数に到達したら全て削除して1個から再開する。
+
+新しいParticleは、位置、移動方向、速さ、拡縮、向き、角速度をランダムに決める。
 
 /// --- 4_ImGui更新 ---
 色、TextureMode、DisplayMode、Scale、Rotation、Positionなどの操作項目を作る。
@@ -140,9 +156,10 @@ ImGui::RenderでImGuiの描画データを確定する。
 7_VertexBufferとPrimitiveTopologyを設定する。
 8_MaterialとWVPのConstantBufferを設定する。
 9_ImGuiで選択したTextureのSRVを設定する。
-10_DrawInstancedをCommandListへ積む。
-11_ImGuiの描画コマンドを積む。
-12_BackBufferをRENDER_TARGETからPRESENTへ戻す。
+10_Production ModeではParticleごとに別のWVPアドレスを設定し、各Particleを3頂点で描画する。
+11_DrawInstancedをCommandListへ積む。
+12_ImGuiの描画コマンドを積む。
+13_BackBufferをRENDER_TARGETからPRESENTへ戻す。
 
 /// --- 6_コマンドの実行 ---
 1_CommandListをCloseして記録を確定する。
@@ -163,6 +180,7 @@ VertexBuffer、ConstantBuffer、Texture、DepthStencilTextureを解放する。
 /// --- 3_クラスが所有するリソース ---
 PipelineStateがPSO、ShaderBlob、RootSignature、DXCを解放する。
 CommandContextがFence、CommandList、CommandAllocator、CommandQueueを解放する。
+ParticleSystemがParticleごとのWVPResourceを解放する。
 
 /// --- 4_DirectX 12全体 ---
 DescriptorHeap、SwapChain、BackBuffer、Device、Adapter、DXGIFactoryの順に解放する。
