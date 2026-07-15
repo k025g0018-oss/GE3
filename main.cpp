@@ -261,6 +261,14 @@ DirectX::ScratchImage LoadTexture(const std::string& filePath) {
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
 	assert(SUCCEEDED(hr));
 
+	// 1x1用
+	const DirectX::TexMetadata& metadata =
+		image.GetMetadata();
+	// 1×1画像は縮小できないので、そのまま返す
+	if (metadata.width == 1 && metadata.height == 1) {
+		return image;
+	}
+
 	// ミップマップの作製
 	DirectX::ScratchImage mipImages{};
 	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
@@ -889,25 +897,53 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/// --- Textureの読み込みと転送 ---
 	// テクスチャの切り替え用
-	int textureMode = 1;
+	int textureMode = 0;
 
-	// 猫画像
-	uint32_t genbanekoTextureIndex = 0;
+	// 使用するテクスチャ数
+	const uint32_t kTextureCount = 3;
 
-	// Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
-	//DirectX::ScratchImage mipImages = LoadTexture("genbaneko.png");
+	// テクスチャのファイルパス
+	const char* textureFilePaths[kTextureCount] = {
+		"resources/white.png",
+		"resources/uvChecker.png",
+		"resources/genbaneko.png"
+	};
 
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+	// 読み込んだ画像を保存する
+	DirectX::ScratchImage textureMipImages[kTextureCount];
+	
+	// GPU上のテクスチャを保存する
+	ID3D12Resource* textureResources[kTextureCount] = {nullptr};
 
-	// VRAM上にテクスチャリソースを作成
-	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
+	// 転送用リソースを保存する
+	ID3D12Resource* intermediateResources[kTextureCount] = {nullptr};
+
+	// 3枚のテクスチャを読み込んでGPUへ転送する
+	for (uint32_t i = 0; i < kTextureCount; ++i) {
+		textureMipImages[i] = LoadTexture(textureFilePaths[i]);
+
+		const DirectX::TexMetadata& metadata =
+			textureMipImages[i].GetMetadata();
+
+		textureResources[i] =
+			CreateTextureResource(device, metadata);
+
+		intermediateResources[i] =
+			UploadTextureData(
+				textureResources[i],
+				textureMipImages[i],
+				device,
+				commandList
+			);
+	}
 
 	// 深度ステンシルテクスチャリソースを作る
-	ID3D12Resource* depthStencilResource = CreateDepthStencilTextureResource(device, kClientWidth, kClientHeight);
-
-	// リソースの作成とコピーコマンドの記録
-	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+	ID3D12Resource* depthStencilResource =
+		CreateDepthStencilTextureResource(
+			device,
+			kClientWidth,
+			kClientHeight
+		);
 
 	// コマンドリストを確定して実行（キック）する
 	hr = commandList->Close();
@@ -925,7 +961,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	}
 
 	// 転送が終わったのでソースは解放する
-	intermediateResource->Release();
+	// GPUへの転送が終わったので転送用リソースを解放する
+	for (uint32_t i = 0; i < kTextureCount; ++i) {
+		intermediateResources[i]->Release();
+	}
 
 	// 次のフレームや初期化の続きのためにリセット
 	hr = commandAllocator->Reset();
@@ -934,23 +973,63 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(hr));
 
 	/// --- Texture用のSRV作成 ---
-	// metaDataをもとにSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	srvDesc.Format = metadata.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+	// SRV1個分のサイズを取得する
+	const uint32_t srvDescriptorSize =
+		device->GetDescriptorHandleIncrementSize(
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+		);
 
-	// SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	// SRVヒープの先頭を取得する
+	D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU =
+		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
-	//先頭はImGuiが使っているのでその次を使う
-	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU =
+		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
-	// SRVの生成
-	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+	// ImGuiが0番を使うため、テクスチャは1番から使用する
+	srvHandleCPU.ptr += srvDescriptorSize;
+	srvHandleGPU.ptr += srvDescriptorSize;
+
+	// 描画時に使用するGPUハンドル
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandlesGPU[kTextureCount]{};
+
+	// 3枚分のSRVを作る
+	for (uint32_t i = 0; i < kTextureCount; ++i) {
+		const DirectX::TexMetadata& metadata =
+			textureMipImages[i].GetMetadata();
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Format = metadata.format;
+		srvDesc.Shader4ComponentMapping =
+			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension =
+			D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels =
+			static_cast<UINT>(metadata.mipLevels);
+
+		// 使用するSRVの位置を計算する
+		D3D12_CPU_DESCRIPTOR_HANDLE currentSrvHandleCPU =
+			srvHandleCPU;
+
+		D3D12_GPU_DESCRIPTOR_HANDLE currentSrvHandleGPU =
+			srvHandleGPU;
+
+		currentSrvHandleCPU.ptr +=
+			static_cast<SIZE_T>(srvDescriptorSize) * i;
+
+		currentSrvHandleGPU.ptr +=
+			static_cast<UINT64>(srvDescriptorSize) * i;
+
+		// SRVを生成する
+		device->CreateShaderResourceView(
+			textureResources[i],
+			&srvDesc,
+			currentSrvHandleCPU
+		);
+
+		// 描画時に使えるように保存する
+		textureSrvHandlesGPU[i] = currentSrvHandleGPU;
+	}
 
 	// DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -1341,7 +1420,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- 画像変えれます ---
 			// テクスチャ切り替え
 			const char* textureModes[] = {
-				"0 : No Texture",
+				"0 : No Texture (White)",
 				"1 : UV Checker",
 				"2 : Genbaneko"
 			};
@@ -1539,10 +1618,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			// 画像を指定
-			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle{};
+			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle =
+				textureSrvHandlesGPU[textureMode];
 
-			// SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			// 選択されたテクスチャをシェーダーへ渡す
+			commandList->SetGraphicsRootDescriptorTable(
+				2,
+				currentTextureHandle
+			);
 
 			// 1_モード4は全三角形描画
 			if (displayMode == 4) {
@@ -1669,7 +1752,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	vertexResource->Release();
 	wvpResource->Release();
 	materialResource->Release();
-	textureResource->Release();
+	// 読み込んだテクスチャをすべて解放する
+	for (uint32_t i = 0; i < kTextureCount; ++i) {
+		textureResources[i]->Release();
+	}
 	depthStencilResource->Release();
 
 	// 2_シェーダ・Blob関連（これらもdeviceより前）
