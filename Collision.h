@@ -10,7 +10,7 @@ public:
         float dy = pos2.y - pos1.y;
         float dz = pos2.z - pos1.z; // Z軸も考慮
 
-        // 距離の二乗を計算（平方根計算は重いので、二乗同士で比較するのがコツ）
+        // 距離の二乗を計算(平方根計算は重いので、二乗同士で比較するのがコツ)
         float distSq = (dx * dx) + (dy * dy) + (dz * dz);
         float radiusSum = r1 + r2;
 

@@ -114,8 +114,24 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="BlendState.cpp" />
+    <ClCompile Include="BufferResource.cpp" />
+    <ClCompile Include="CommandContext.cpp" />
+    <ClCompile Include="DepthStencilState.cpp" />
+    <ClCompile Include="DepthStencilView.cpp" />
+    <ClCompile Include="DescriptorHeap.cpp" />
+    <ClCompile Include="DxcCompiler.cpp" />
+    <ClCompile Include="InputLayout.cpp" />
+    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="PipelineState.cpp" />
+    <ClCompile Include="RasterizerState.cpp" />
+    <ClCompile Include="RootSignature.cpp" />
+    <ClCompile Include="ShaderProgram.cpp" />
+    <ClCompile Include="ShaderResourceView.cpp" />
+    <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Vector.cpp" />
+    <ClCompile Include="VertexBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -132,7 +148,14 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BlendState.h" />
+    <ClInclude Include="BufferResource.h" />
     <ClInclude Include="Collision.h" />
+    <ClInclude Include="CommandContext.h" />
+    <ClInclude Include="DepthStencilState.h" />
+    <ClInclude Include="DepthStencilView.h" />
+    <ClInclude Include="DescriptorHeap.h" />
+    <ClInclude Include="DxcCompiler.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -141,10 +164,21 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="externals\imgui\imstb_rectpack.h" />
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
+    <ClInclude Include="InputLayout.h" />
     <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="Logger.h" />
+    <ClInclude Include="PipelineState.h" />
+    <ClInclude Include="RasterizerState.h" />
+    <ClInclude Include="RootSignature.h" />
+    <ClInclude Include="ShaderProgram.h" />
+    <ClInclude Include="ShaderResourceView.h" />
+    <ClInclude Include="TextureManager.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="VertexBuffer.h" />
+    <ClInclude Include="VertexData.h" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="Memo.txt" />
     <Text Include="externals\imgui\LICENSE.txt" />
   </ItemGroup>
   <ItemGroup>
