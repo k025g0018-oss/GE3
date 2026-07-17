@@ -42,6 +42,10 @@ main.cppには「何をどの順番で行うか」を残し、各クラスには
   Production Modeで使用する三角形の生成、移動、回転、壁反射、増殖、描画を管理する。
   Particleごとに別のWVP領域を持ち、複数の三角形を別々の位置へ描画する。
 
+・Sprite
+  2D用のVertexBuffer、Material、Transform、WVPを管理する。
+  正射影行列を使い、3Dの描画モードとは別にSpriteを描画する。
+
 ・CommandContext
   CommandQueue、CommandAllocator、CommandList、Fenceを所有する。
   CPUがコマンドを記録し、GPUへ渡し、完了を待って次のフレームへ進む流れを管理する。
@@ -106,6 +110,7 @@ RootSignatureやShaderなどの設定は、描画中に毎回作らない。
 7_DepthStencilTextureとDSVを作る。
 8_CommandContextで転送コマンドを実行する。
 9_ParticleSystemへ移動範囲、最大数、Particle用WVPResourceを設定する。
+10_Sprite用のVertexBuffer、MaterialResource、WVPResourceを作る。
 
 /// --- 8_ImGui ---
 1_ImGui Contextを作る。
@@ -132,6 +137,8 @@ ImGui_ImplDX12_NewFrame、ImGui_ImplWin32_NewFrame、ImGui::NewFrameの順で開
 6_World、View、Projectionを掛けてWVPを作る。
 7_WVP用ConstantBufferへ計算結果を書く。
 
+Spriteでは、SRTからWorld行列を作り、単位行列のViewと正射影のProjectionを使ってWVPを更新する。
+
 Production Modeでは、ParticleSystemが次の順番で更新する。
 
 1_各Particleを速度に従って移動する。
@@ -144,6 +151,7 @@ Production Modeでは、ParticleSystemが次の順番で更新する。
 
 /// --- 4_ImGui更新 ---
 色、TextureMode、DisplayMode、Scale、Rotation、Positionなどの操作項目を作る。
+Spriteは三角形とは別のTextureMode、Material Color、SRTを操作する。
 ImGui::RenderでImGuiの描画データを確定する。
 
 /// --- 5_描画コマンドを積む ---
@@ -158,8 +166,9 @@ ImGui::RenderでImGuiの描画データを確定する。
 9_ImGuiで選択したTextureのSRVを設定する。
 10_Production ModeではParticleごとに別のWVPアドレスを設定し、各Particleを3頂点で描画する。
 11_DrawInstancedをCommandListへ積む。
-12_ImGuiの描画コマンドを積む。
-13_BackBufferをRENDER_TARGETからPRESENTへ戻す。
+12_3D描画の後にSprite専用のVertexBuffer、Material、WVP、Textureを設定して6頂点を描画する。
+13_ImGuiの描画コマンドを積む。
+14_BackBufferをRENDER_TARGETからPRESENTへ戻す。
 
 /// --- 6_コマンドの実行 ---
 1_CommandListをCloseして記録を確定する。
@@ -181,6 +190,7 @@ VertexBuffer、ConstantBuffer、Texture、DepthStencilTextureを解放する。
 PipelineStateがPSO、ShaderBlob、RootSignature、DXCを解放する。
 CommandContextがFence、CommandList、CommandAllocator、CommandQueueを解放する。
 ParticleSystemがParticleごとのWVPResourceを解放する。
+SpriteがVertexBuffer、MaterialResource、WVPResourceを解放する。
 
 /// --- 4_DirectX 12全体 ---
 DescriptorHeap、SwapChain、BackBuffer、Device、Adapter、DXGIFactoryの順に解放する。

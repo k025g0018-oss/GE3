@@ -22,8 +22,13 @@
 #include "Logger.h"
 #include "ParticleSystem.h"
 #include "PipelineState.h"
+#include "Sprite.h"
 #include "TextureManager.h"
 #include "VertexBuffer.h"
+
+#include <filesystem> // フォルダとファイルを列挙するため
+#include <string>     // ファイル名をstd::stringで扱うため
+#include <system_error> // フォルダ列挙エラーを安全に受け取るため
 
 // ImGui
 #ifdef USE_IMGUI
@@ -90,6 +95,106 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	// 他に関連付けられているSEH例外ハンドラがあれば実行。通常はプロセスを終了する。
 	return EXCEPTION_EXECUTE_HANDLER;
 }
+
+///// ----- ImGuiパネル ----- /////
+#ifdef USE_IMGUI
+// Hierarchyで現在選択されている項目を表す
+enum class SelectedObject {
+	None,
+	Pyramid,
+	Sprite,
+	ParticleSystem
+};
+
+// 選択結果をPropertiesへ渡せるように参照で受け取る
+void DrawHierarchy(SelectedObject& selectedObject) {
+	ImGui::Begin("Hierarchy");
+
+	if (ImGui::Selectable(
+		"Pyramid",
+		selectedObject == SelectedObject::Pyramid)) {
+		selectedObject = SelectedObject::Pyramid;
+	}
+
+	if (ImGui::Selectable(
+		"Sprite",
+		selectedObject == SelectedObject::Sprite)) {
+		selectedObject = SelectedObject::Sprite;
+	}
+
+	if (ImGui::Selectable(
+		"ParticleSystem",
+		selectedObject == SelectedObject::ParticleSystem)) {
+		selectedObject = SelectedObject::ParticleSystem;
+	}
+
+	ImGui::End();
+}
+
+// Scene用レンダーテクスチャを作るまでは仮表示にする
+void DrawScene() {
+	ImGui::Begin("Scene");
+	ImGui::Text("Scene view is not implemented yet.");
+	ImGui::End();
+}
+
+// 選択オブジェクトとの接続は後から実装する
+void DrawProperties() {
+	ImGui::Begin("Properties");
+	ImGui::Text("Select an object.");
+	ImGui::End();
+}
+
+// 描画統計を表示する
+void DrawStatistics() {
+	ImGui::Begin("Statistics");
+	ImGui::Text("Statistics");
+	ImGui::End();
+}
+
+// 指定されたフォルダの中身だけを再帰的に表示する
+void DrawDirectoryTree(const std::filesystem::path& directory) {
+	std::error_code error;
+
+	for (const auto& entry :
+		std::filesystem::directory_iterator(directory, error)) {
+
+		if (error) {
+			ImGui::Text("Failed to read directory.");
+			return;
+		}
+
+		const std::string name = entry.path().filename().string();
+
+		if (entry.is_directory()) {
+			// フォルダをツリーとして開閉可能にする
+			if (ImGui::TreeNode(name.c_str())) {
+				DrawDirectoryTree(entry.path());
+				ImGui::TreePop();
+			}
+		} else {
+			// ファイルを選択可能な項目として表示する
+			ImGui::Selectable(name.c_str());
+		}
+	}
+}
+
+// Content Browserウィンドウは毎フレーム1回だけ作る
+void DrawContentBrowser() {
+	ImGui::Begin("Content Browser");
+
+	const std::filesystem::path resourceDirectory = "resources";
+
+	if (std::filesystem::exists(resourceDirectory)) {
+		DrawDirectoryTree(resourceDirectory);
+	} else {
+		ImGui::Text("resources folder was not found.");
+	}
+
+	ImGui::End();
+}
+
+#endif
 
 #pragma endregion 関数の定義エリア
 
@@ -357,6 +462,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	VertexBuffer vertexBuffer;
 	vertexBuffer.Initialize(device, kMaxVertexCount);
 
+	///// ----- Sprite ----- /////
+
+	/// --- 初期化 ---
+	// Sprite専用のVertexBuffer、Material、WVPを作成
+	Sprite sprite;
+	sprite.Initialize(device, kClientWidth, kClientHeight, 640.0f, 360.0f);
+
+	// 三角形とは別にSpriteのTextureを選択する
+	int spriteTextureMode = 1;
+
 	/// Material用のリソースを作る
 	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Vector4));
 	// マテリアルにデータを書き込む
@@ -532,15 +647,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	Matrix4x4 projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 
-	/// --- ImGuiの初期化 ---
+	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	// Docking対応版へ更新した後に有効化する
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
 	ImGui::StyleColorsDark();
 	ImGui_ImplWin32_Init(hwnd);
-	ImGui_ImplDX12_Init(device, swapChainDesc.BufferCount, rtvDesc.Format, srvDescriptorHeap.Get(), srvDescriptorHeap.GetCPUHandleStart(), srvDescriptorHeap.GetGPUHandleStart());
-	ImGuiIO& io = ImGui::GetIO();
+
+	// Dear ImGuiのDirectX 12初期化情報をまとめる
+	ImGui_ImplDX12_InitInfo initInfo{};
+	initInfo.Device = device;
+	initInfo.CommandQueue = commandContext.GetCommandQueue();
+	initInfo.NumFramesInFlight = swapChainDesc.BufferCount;
+	initInfo.RTVFormat = rtvDesc.Format;
+	initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	initInfo.SrvDescriptorHeap = srvDescriptorHeap.Get();
+
+	// 動的なSRV管理を実装するまで、従来どおり先頭ディスクリプタを使用する
+	initInfo.LegacySingleSrvCpuDescriptor =
+		srvDescriptorHeap.GetCPUHandleStart();
+	initInfo.LegacySingleSrvGpuDescriptor =
+		srvDescriptorHeap.GetGPUHandleStart();
+
+	// 新しいDirectX 12バックエンド初期化形式を使用する
+	ImGui_ImplDX12_Init(&initInfo);
+
 	io.Fonts->Build();
+
+	SelectedObject selectedObject = SelectedObject::None;
 #endif // USE_IMGUI
 
 	/// --- メインループ ---
@@ -556,6 +696,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
+
+			// 画面全体を各エディターパネルの配置領域として使用する
+			ImGui::DockSpaceOverViewport();
+
+			DrawHierarchy(selectedObject);
+			DrawScene();
+			DrawProperties();
+			DrawContentBrowser();
+			DrawStatistics();
 #endif // USE_IMGUI
 
 			/// --- ゲームの処理 ---
@@ -764,12 +913,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// wvp行列をGPUに送る
 			*wvpData = worldViewProjectionMatrix;
 
-			/// --- ImGui中身 ---
+			///// ----- ImGui中身 ----- /////
 #ifdef USE_IMGUI
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Window");
+
+			// Hierarchyで選択されたオブジェクトの設定をPropertiesへ表示する
+			ImGui::Begin("Properties");
+
+			if (selectedObject == SelectedObject::Pyramid) {
+				ImGui::Text("Transform");
+
+				// 選択中のオブジェクトだけを編集できるようにする
+				ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+				ImGui::DragFloat3("Rotation", &transform.rotate.x, 0.01f);
+				ImGui::DragFloat3("Position", &transform.translate.x, 0.01f);
+
+				ImGui::Separator();
+
+				// 既存のマテリアル設定をPropertiesへ移す
+				ImGui::ColorEdit4("Material Color", &materialData->x);
+			}
+
+			ImGui::End();
 
 			/// --- 色変えれます ---
 			ImGui::Text("Color Control");
@@ -792,6 +960,37 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				textureModes,
 				IM_ARRAYSIZE(textureModes)
 			);
+
+			// 区切り線
+			ImGui::Separator();
+
+			///// ----- Sprite ----- /////
+
+			/// --- Texture ---
+			// 三角形とは別にSpriteのTextureを切り替える
+			ImGui::Text("Sprite Control");
+			ImGui::Combo(
+				"Sprite Texture Mode",
+				&spriteTextureMode,
+				textureModes,
+				IM_ARRAYSIZE(textureModes)
+			);
+
+			/// --- 色 ---
+			// Sprite専用のMaterial Colorを変更する
+			ImGui::ColorEdit4("Sprite Material Color", &sprite.GetColor().x);
+
+			/// --- SRT ---
+			// Sprite専用のScale、Rotate、Translateを変更する
+			Transform& spriteTransform = sprite.GetTransform();
+			ImGui::DragFloat3("Sprite Scale", &spriteTransform.scale.x, 0.01f);
+			ImGui::DragFloat3("Sprite Rotate", &spriteTransform.rotate.x, 0.01f);
+			ImGui::DragFloat3("Sprite Translate", &spriteTransform.translate.x, 1.0f);
+
+			// Spriteだけを初期状態へ戻す
+			if (ImGui::Button("Reset Sprite")) {
+				sprite.Reset();
+			}
 
 			// 区切り線
 			ImGui::Separator();
@@ -921,6 +1120,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::End();
 #endif // USE_IMGUI
 
+			// ImGuiで変更されたSpriteのSRTからWVPを更新する
+			sprite.Update();
+
 			/// --- ImGui終わり ---
 #ifdef USE_IMGUI
 			// 内部コマンドを生成する
@@ -1008,6 +1210,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				);
 			}
 
+			///// ----- Sprite描画 ----- /////
+
+			/// --- Texture ---
+			// 三角形とは別に選択されたTextureを取得する
+			const D3D12_GPU_DESCRIPTOR_HANDLE spriteTextureHandle =
+				textureManager.GetSrvHandle(static_cast<uint32_t>(spriteTextureMode));
+
+			/// --- 描画 ---
+			// 3Dの後に描画してSpriteを最前面へ表示する
+			sprite.Draw(commandList, spriteTextureHandle);
+
 			// 画面表示できるようにする
 			// 今回はRenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -1039,6 +1252,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- 解放処理 ---
 	// 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前)
 	vertexBuffer.Finalize();
+	sprite.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();
 	materialResource->Release();
