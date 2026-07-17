@@ -22,6 +22,7 @@
 #include "Logger.h"
 #include "ParticleSystem.h"
 #include "PipelineState.h"
+#include "SceneRenderTexture.h"
 #include "Sprite.h"
 #include "TextureManager.h"
 #include "VertexBuffer.h"
@@ -29,6 +30,8 @@
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
 #include <system_error> // フォルダ列挙エラーを安全に受け取るため
+
+#include <vector> // ImGuiが使用するSRV番号を管理するため
 
 // ImGui
 #ifdef USE_IMGUI
@@ -103,7 +106,39 @@ enum class SelectedObject {
 	None,
 	Pyramid,
 	Sprite,
-	ParticleSystem
+	ParticleSystem,
+	SceneSettings
+};
+
+// Dear ImGui 1.92以降が必要とするSRVの確保と解放を管理する
+struct ImGuiSrvDescriptorAllocator {
+	const DescriptorHeap* descriptorHeap = nullptr;
+	std::vector<uint32_t> freeIndices;
+
+	// ゲーム用SRV(1～4番)と衝突しないようにヒープ後半をImGui専用にする
+	void Initialize(const DescriptorHeap& heap, uint32_t firstIndex) {
+		descriptorHeap = &heap;
+		for (uint32_t index = heap.GetDescriptorCount(); index > firstIndex; --index) {
+			freeIndices.push_back(index - 1);
+		}
+	}
+
+	void Allocate(D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle) {
+		assert(!freeIndices.empty());
+		const uint32_t index = freeIndices.back();
+		freeIndices.pop_back();
+		*cpuHandle = descriptorHeap->GetCPUHandle(index);
+		*gpuHandle = descriptorHeap->GetGPUHandle(index);
+	}
+
+	void Free(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) {
+		const SIZE_T cpuOffset = cpuHandle.ptr - descriptorHeap->GetCPUHandleStart().ptr;
+		const UINT64 gpuOffset = gpuHandle.ptr - descriptorHeap->GetGPUHandleStart().ptr;
+		const uint32_t cpuIndex = static_cast<uint32_t>(cpuOffset / descriptorHeap->GetDescriptorSize());
+		const uint32_t gpuIndex = static_cast<uint32_t>(gpuOffset / descriptorHeap->GetDescriptorSize());
+		assert(cpuIndex == gpuIndex);
+		freeIndices.push_back(cpuIndex);
+	}
 };
 
 // 選択結果をPropertiesへ渡せるように参照で受け取る
@@ -111,7 +146,7 @@ void DrawHierarchy(SelectedObject& selectedObject) {
 	ImGui::Begin("Hierarchy");
 
 	if (ImGui::Selectable(
-		"Pyramid",
+		"3D Object (Triangle / Pyramid)",
 		selectedObject == SelectedObject::Pyramid)) {
 		selectedObject = SelectedObject::Pyramid;
 	}
@@ -128,27 +163,149 @@ void DrawHierarchy(SelectedObject& selectedObject) {
 		selectedObject = SelectedObject::ParticleSystem;
 	}
 
+	ImGui::Separator();
+	if (ImGui::Selectable(
+		"Scene Settings",
+		selectedObject == SelectedObject::SceneSettings)) {
+		selectedObject = SelectedObject::SceneSettings;
+	}
+
 	ImGui::End();
 }
 
-// Scene用レンダーテクスチャを作るまでは仮表示にする
-void DrawScene() {
+// Hierarchyで選択中の項目名をSceneとPropertiesで共有する
+const char* GetSelectedObjectName(SelectedObject selectedObject) {
+	switch (selectedObject) {
+		case SelectedObject::Pyramid:
+			return "3D Object (Triangle / Pyramid)";
+		case SelectedObject::Sprite:
+			return "Sprite";
+		case SelectedObject::ParticleSystem:
+			return "ParticleSystem";
+		case SelectedObject::SceneSettings:
+			return "Scene Settings";
+		default:
+			return "None";
+	}
+}
+
+// Scene用レンダーテクスチャをパネル内へ表示する
+void DrawScene(D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle, SelectedObject selectedObject) {
 	ImGui::Begin("Scene");
-	ImGui::Text("Scene view is not implemented yet.");
+	ImGui::Text("Selected : %s", GetSelectedObjectName(selectedObject));
+	const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+	if (panelSize.x > 0.0f && panelSize.y > 0.0f) {
+		// Scene用SRVをImGuiの画像としてパネル全体へ表示する
+		const ImTextureRef sceneTexture(static_cast<ImTextureID>(sceneSrvHandle.ptr));
+		ImGui::Image(sceneTexture, panelSize);
+	}
 	ImGui::End();
 }
 
-// 選択オブジェクトとの接続は後から実装する
-void DrawProperties() {
-	ImGui::Begin("Properties");
-	ImGui::Text("Select an object.");
+// Particle Flow内の1ノードを描画する
+void DrawParticleFlowNode(
+	ImDrawList* drawList,
+	const ImVec2& position,
+	const ImVec2& size,
+	const char* label,
+	bool active,
+	bool eventActive = false
+) {
+	const ImU32 backgroundColor = eventActive
+		? IM_COL32(205, 115, 35, 255)
+		: active ? IM_COL32(50, 145, 90, 255) : IM_COL32(55, 60, 70, 255);
+	const ImU32 borderColor = active || eventActive
+		? IM_COL32(245, 245, 245, 255)
+		: IM_COL32(105, 110, 120, 255);
+
+	drawList->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), backgroundColor, 7.0f);
+	drawList->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), borderColor, 7.0f, 0, 2.0f);
+	const ImVec2 textSize = ImGui::CalcTextSize(label);
+	drawList->AddText(
+		ImVec2(position.x + (size.x - textSize.x) * 0.5f, position.y + (size.y - textSize.y) * 0.5f),
+		IM_COL32(255, 255, 255, 255),
+		label
+	);
+}
+
+// ノード間の処理順を矢印で描画する
+void DrawParticleFlowArrow(ImDrawList* drawList, const ImVec2& from, const ImVec2& to, bool active) {
+	const ImU32 color = active ? IM_COL32(95, 225, 140, 255) : IM_COL32(115, 120, 130, 255);
+	drawList->AddLine(from, to, color, active ? 3.0f : 2.0f);
+	const float direction = to.x >= from.x ? 1.0f : -1.0f;
+	drawList->AddTriangleFilled(
+		to,
+		ImVec2(to.x - 8.0f * direction, to.y - 5.0f),
+		ImVec2(to.x - 8.0f * direction, to.y + 5.0f),
+		color
+	);
+}
+
+// ParticleSystemの実行順と直近イベントを読み取り専用で可視化する
+void DrawParticleFlow(const ParticleSystem& particleSystem) {
+	ImGui::Begin("Particle Flow");
+	const ParticleSystem::DebugFlowState& state = particleSystem.GetDebugFlowState();
+
+	ImGui::Text(
+		"Particles : %d / %d",
+		static_cast<int>(particleSystem.GetParticleCount()),
+		static_cast<int>(particleSystem.GetMaxParticleCount())
+	);
+	ImGui::Text("Collision : %u    Spawn : %u", state.collisionCount, state.spawnCount);
+	ImGui::Text(
+		"Last Event : %s",
+		state.resetOccurred ? "Reset" : state.spawnCount > 0 ? "Spawn" : state.collisionCount > 0 ? "Collision" : "Update"
+	);
+	ImGui::Separator();
+
+	const ImVec2 canvasStart = ImGui::GetCursorScreenPos();
+	const ImVec2 nodeSize(125.0f, 44.0f);
+	const float gap = 32.0f;
+	const float rowGap = 52.0f;
+	const ImVec2 updatePos = canvasStart;
+	const ImVec2 movePos(updatePos.x + nodeSize.x + gap, updatePos.y);
+	const ImVec2 collisionPos(movePos.x + nodeSize.x + gap, movePos.y);
+	const ImVec2 reflectPos(collisionPos.x + nodeSize.x + gap, collisionPos.y);
+	const ImVec2 spawnPos(reflectPos.x, reflectPos.y + nodeSize.y + rowGap);
+	const ImVec2 maxCheckPos(collisionPos.x, spawnPos.y);
+	const ImVec2 resetPos(movePos.x, spawnPos.y);
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	DrawParticleFlowArrow(drawList, ImVec2(updatePos.x + nodeSize.x, updatePos.y + 22.0f), ImVec2(movePos.x, movePos.y + 22.0f), state.moveExecuted);
+	DrawParticleFlowArrow(drawList, ImVec2(movePos.x + nodeSize.x, movePos.y + 22.0f), ImVec2(collisionPos.x, collisionPos.y + 22.0f), state.collisionChecked);
+	DrawParticleFlowArrow(drawList, ImVec2(collisionPos.x + nodeSize.x, collisionPos.y + 22.0f), ImVec2(reflectPos.x, reflectPos.y + 22.0f), state.collisionCount > 0);
+	DrawParticleFlowArrow(drawList, ImVec2(reflectPos.x + nodeSize.x * 0.5f, reflectPos.y + nodeSize.y), ImVec2(spawnPos.x + nodeSize.x * 0.5f, spawnPos.y), state.spawnCount > 0);
+	DrawParticleFlowArrow(drawList, ImVec2(spawnPos.x, spawnPos.y + 22.0f), ImVec2(maxCheckPos.x + nodeSize.x, maxCheckPos.y + 22.0f), state.updateExecuted);
+	DrawParticleFlowArrow(drawList, ImVec2(maxCheckPos.x, maxCheckPos.y + 22.0f), ImVec2(resetPos.x + nodeSize.x, resetPos.y + 22.0f), state.resetOccurred);
+
+	DrawParticleFlowNode(drawList, updatePos, nodeSize, "1. Update", state.updateExecuted);
+	DrawParticleFlowNode(drawList, movePos, nodeSize, "2. Move / Rotate", state.moveExecuted);
+	DrawParticleFlowNode(drawList, collisionPos, nodeSize, "3. Wall Check", state.collisionChecked);
+	DrawParticleFlowNode(drawList, reflectPos, nodeSize, "4. Reflect", state.collisionCount > 0, state.collisionCount > 0);
+	DrawParticleFlowNode(drawList, spawnPos, nodeSize, "5. Spawn", state.spawnCount > 0, state.spawnCount > 0);
+	DrawParticleFlowNode(drawList, maxCheckPos, nodeSize, "6. Max Check", state.updateExecuted);
+	DrawParticleFlowNode(drawList, resetPos, nodeSize, "7. Reset", state.resetOccurred, state.resetOccurred);
+
+	ImGui::Dummy(ImVec2((nodeSize.x + gap) * 4.0f, nodeSize.y * 2.0f + rowGap + 10.0f));
 	ImGui::End();
 }
 
 // 描画統計を表示する
-void DrawStatistics() {
+void DrawStatistics(const ParticleSystem& particleSystem) {
 	ImGui::Begin("Statistics");
-	ImGui::Text("Statistics");
+	ImGui::Text("FPS : %.1f", ImGui::GetIO().Framerate);
+	ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem.GetParticleCount()));
+	ImGui::Text("Total Vertex Count : %d", static_cast<int>(particleSystem.GetTotalVertexCount()));
+
+	const ParticleSystem::Particle* firstParticle = particleSystem.GetFirstParticle();
+	if (firstParticle != nullptr) {
+		ImGui::Separator();
+		ImGui::Text(
+			"First Particle Pos X: %.3f Y: %.3f",
+			firstParticle->position.x,
+			firstParticle->position.y
+		);
+	}
 	ImGui::End();
 }
 
@@ -190,6 +347,180 @@ void DrawContentBrowser() {
 	} else {
 		ImGui::Text("resources folder was not found.");
 	}
+
+	ImGui::End();
+}
+
+// TextureManagerへ読み込み済みのPNGなら、対応するSRVを返す
+bool TryGetLoadedTexture(
+	const std::filesystem::path& path,
+	const TextureManager& textureManager,
+	D3D12_GPU_DESCRIPTOR_HANDLE& srvHandle
+) {
+	const std::string fileName = path.filename().string();
+	if (fileName == "white.png") {
+		srvHandle = textureManager.GetSrvHandle(0);
+		return true;
+	}
+	if (fileName == "uvChecker.png") {
+		srvHandle = textureManager.GetSrvHandle(1);
+		return true;
+	}
+	if (fileName == "genbaneko.png") {
+		srvHandle = textureManager.GetSrvHandle(2);
+		return true;
+	}
+	return false;
+}
+
+// 拡張子に合わせた紙アイコンをDear ImGuiの図形で描く
+void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2& size) {
+	ImGui::InvisibleButton(id, size);
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	const ImVec2 min = ImGui::GetItemRectMin();
+	const ImVec2 max = ImGui::GetItemRectMax();
+	const float foldSize = size.x * 0.24f;
+
+	drawList->AddRectFilled(min, max, color, 5.0f);
+	drawList->AddTriangleFilled(
+		ImVec2(max.x - foldSize, min.y),
+		ImVec2(max.x, min.y + foldSize),
+		ImVec2(max.x - foldSize, min.y + foldSize),
+		IM_COL32(235, 235, 235, 255)
+	);
+
+	const ImVec2 textSize = ImGui::CalcTextSize(text);
+	drawList->AddText(
+		ImVec2(min.x + (size.x - textSize.x) * 0.5f, min.y + (size.y - textSize.y) * 0.58f),
+		IM_COL32(255, 255, 255, 255),
+		text
+	);
+}
+
+// フォルダまたはファイルの種類に合ったアイコンを表示する
+bool DrawContentBrowserIcon(
+	const std::filesystem::directory_entry& entry,
+	const TextureManager& textureManager,
+	const ImVec2& iconSize
+) {
+	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
+	if (!entry.is_directory() && TryGetLoadedTexture(entry.path(), textureManager, textureHandle)) {
+		const ImTextureRef texture(static_cast<ImTextureID>(textureHandle.ptr));
+		return ImGui::ImageButton("##TextureThumbnail", texture, iconSize);
+	}
+
+	const std::string extension = entry.path().extension().string();
+	if (entry.is_directory()) {
+		DrawDocumentIcon("##FolderIcon", "DIR", IM_COL32(210, 160, 45, 255), iconSize);
+	} else if (extension == ".h" || extension == ".hpp") {
+		DrawDocumentIcon("##HeaderIcon", "H", IM_COL32(70, 130, 210, 255), iconSize);
+	} else if (extension == ".cpp") {
+		DrawDocumentIcon("##CppIcon", "C++", IM_COL32(80, 95, 180, 255), iconSize);
+	} else if (extension == ".hlsl" || extension == ".hlsli") {
+		DrawDocumentIcon("##ShaderIcon", "HLSL", IM_COL32(145, 75, 180, 255), iconSize);
+	} else if (extension == ".png") {
+		DrawDocumentIcon("##PngIcon", "PNG", IM_COL32(75, 155, 100, 255), iconSize);
+	} else {
+		DrawDocumentIcon("##FileIcon", "FILE", IM_COL32(105, 110, 120, 255), iconSize);
+	}
+	return ImGui::IsItemClicked();
+}
+
+// ソリューション内のフォルダとファイルを、アイコン付きで表示する
+void DrawContentBrowserAssets(const TextureManager& textureManager) {
+	ImGui::Begin("Content Browser");
+
+	static std::filesystem::path currentDirectory = ".";
+	static std::filesystem::path selectedPath;
+
+	if (ImGui::Button("Up") && currentDirectory != ".") {
+		currentDirectory = currentDirectory.parent_path();
+		if (currentDirectory.empty()) {
+			currentDirectory = ".";
+		}
+	}
+	ImGui::SameLine();
+	const std::string currentPathText = currentDirectory.lexically_normal().string();
+	ImGui::TextUnformatted(currentPathText.c_str());
+	ImGui::Separator();
+
+	const float previewWidth = 230.0f;
+	ImGui::BeginChild("ContentFiles", ImVec2(-previewWidth, 0.0f), ImGuiChildFlags_Borders);
+
+	std::error_code error;
+	std::vector<std::filesystem::directory_entry> entries;
+	for (const auto& entry : std::filesystem::directory_iterator(currentDirectory, error)) {
+		entries.push_back(entry);
+	}
+
+	if (error) {
+		ImGui::Text("Failed to read directory.");
+	} else {
+		const float tileWidth = 110.0f;
+		const ImVec2 iconSize(72.0f, 72.0f);
+		const int columnCount = static_cast<int>(ImGui::GetContentRegionAvail().x / tileWidth);
+		const int safeColumnCount = columnCount > 0 ? columnCount : 1;
+		int column = 0;
+
+		for (const auto& entry : entries) {
+			const std::string fullPath = entry.path().string();
+			const std::string fileName = entry.path().filename().string();
+			ImGui::PushID(fullPath.c_str());
+			ImGui::BeginGroup();
+
+			const bool clicked = DrawContentBrowserIcon(entry, textureManager, iconSize);
+			if (clicked) {
+				selectedPath = entry.path();
+			}
+			if (entry.is_directory() && ImGui::IsItemHovered() &&
+				ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+				currentDirectory = entry.path();
+				selectedPath.clear();
+			}
+
+			ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tileWidth - 8.0f);
+			ImGui::TextWrapped("%s", fileName.c_str());
+			ImGui::PopTextWrapPos();
+			ImGui::EndGroup();
+			ImGui::PopID();
+
+			++column;
+			if (column < safeColumnCount) {
+				ImGui::SameLine();
+			} else {
+				column = 0;
+			}
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::SameLine();
+	ImGui::BeginChild("ContentPreview", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+	ImGui::TextUnformatted("Preview");
+	ImGui::Separator();
+	if (!selectedPath.empty()) {
+		const std::string selectedName = selectedPath.filename().string();
+		const std::string selectedExtension = selectedPath.extension().string();
+		ImGui::TextWrapped("%s", selectedName.c_str());
+		ImGui::TextDisabled("%s", selectedExtension.c_str());
+
+		D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
+		if (TryGetLoadedTexture(selectedPath, textureManager, textureHandle)) {
+			const ImTextureRef texture(static_cast<ImTextureID>(textureHandle.ptr));
+			const float imageWidth = ImGui::GetContentRegionAvail().x;
+			ImGui::Image(texture, ImVec2(imageWidth, imageWidth));
+		} else {
+			ImGui::Spacing();
+			const std::string previewText = selectedExtension.empty() ? "DIR" : selectedExtension;
+			DrawDocumentIcon(
+				"##PreviewIcon",
+				previewText.c_str(),
+				IM_COL32(90, 110, 150, 255),
+				ImVec2(96.0f, 96.0f)
+			);
+		}
+	}
+	ImGui::EndChild();
 
 	ImGui::End();
 }
@@ -649,6 +980,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
+	// 1～3番はゲーム用Texture、4番はScene表示用として固定する
+	constexpr uint32_t kSceneSrvDescriptorIndex = 4;
+	SceneRenderTexture sceneRenderTexture;
+	sceneRenderTexture.Initialize(
+		device,
+		srvDescriptorHeap,
+		kSceneSrvDescriptorIndex,
+		kClientWidth,
+		kClientHeight,
+		rtvDesc.Format
+	);
+
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
@@ -669,11 +1012,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	initInfo.SrvDescriptorHeap = srvDescriptorHeap.Get();
 
-	// 動的なSRV管理を実装するまで、従来どおり先頭ディスクリプタを使用する
-	initInfo.LegacySingleSrvCpuDescriptor =
-		srvDescriptorHeap.GetCPUHandleStart();
-	initInfo.LegacySingleSrvGpuDescriptor =
-		srvDescriptorHeap.GetGPUHandleStart();
+	// Dear ImGuiにはゲーム用SRVと重ならない64番以降を割り当てる
+	ImGuiSrvDescriptorAllocator imguiSrvAllocator;
+	imguiSrvAllocator.Initialize(srvDescriptorHeap, 64);
+	initInfo.UserData = &imguiSrvAllocator;
+	initInfo.SrvDescriptorAllocFn = [](
+		ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle
+	) {
+		auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+		allocator->Allocate(cpuHandle, gpuHandle);
+	};
+	initInfo.SrvDescriptorFreeFn = [](
+		ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle
+	) {
+		auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+		allocator->Free(cpuHandle, gpuHandle);
+	};
 
 	// 新しいDirectX 12バックエンド初期化形式を使用する
 	ImGui_ImplDX12_Init(&initInfo);
@@ -701,10 +1059,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::DockSpaceOverViewport();
 
 			DrawHierarchy(selectedObject);
-			DrawScene();
-			DrawProperties();
-			DrawContentBrowser();
-			DrawStatistics();
+			DrawScene(sceneRenderTexture.GetSRVHandle(), selectedObject);
+			DrawContentBrowserAssets(textureManager);
+			DrawStatistics(particleSystem);
+			DrawParticleFlow(particleSystem);
 #endif // USE_IMGUI
 
 			/// --- ゲームの処理 ---
@@ -916,31 +1274,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			///// ----- ImGui中身 ----- /////
 #ifdef USE_IMGUI
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
-			ImGui::ShowDemoWindow();
+			// Dear ImGui標準機能を確認したいときだけ、次の行を有効にする
+			// ImGui::ShowDemoWindow();
 
-			ImGui::Begin("Window");
-
-			// Hierarchyで選択されたオブジェクトの設定をPropertiesへ表示する
+			// 旧Windowパネルの編集項目をPropertiesへまとめる
 			ImGui::Begin("Properties");
-
-			if (selectedObject == SelectedObject::Pyramid) {
-				ImGui::Text("Transform");
-
-				// 選択中のオブジェクトだけを編集できるようにする
-				ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
-				ImGui::DragFloat3("Rotation", &transform.rotate.x, 0.01f);
-				ImGui::DragFloat3("Position", &transform.translate.x, 0.01f);
-
-				ImGui::Separator();
-
-				// 既存のマテリアル設定をPropertiesへ移す
-				ImGui::ColorEdit4("Material Color", &materialData->x);
-			}
-
-			ImGui::End();
+			const char* textureModes[] = {
+				"0 : No Texture (White)",
+				"1 : UV Checker",
+				"2 : Genbaneko"
+			};
 
 			/// --- 色変えれます ---
-			ImGui::Text("Color Control");
+			if (selectedObject == SelectedObject::Pyramid) {
+			ImGui::Text("3D Object Material");
 			ImGui::ColorEdit4("Material Color", &materialData->x);
 
 			// 区切り線
@@ -963,7 +1310,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 区切り線
 			ImGui::Separator();
+			}
 
+			if (selectedObject == SelectedObject::Sprite) {
 			///// ----- Sprite ----- /////
 
 			/// --- Texture ---
@@ -994,7 +1343,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 区切り線
 			ImGui::Separator();
+			}
 
+			if (selectedObject == SelectedObject::SceneSettings) {
 			/// --- モード切り替えを切り替えだドン ---
 			const char* modes[] = {
 				"0: Single Triangle",
@@ -1041,9 +1392,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 区切り線
 			ImGui::Separator();
+			}
 
+			if (selectedObject == SelectedObject::Pyramid) {
 			/// --- 自動で回転かと座標変えれます ---
 			ImGui::Text("Pyramid Control");
+			// 上の選択オブジェクト用Transformと表示名が同じでもIDが重ならないようにする
+			ImGui::PushID("PyramidControl");
 
 			// 1_拡縮の変更(XYZ)
 			ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
@@ -1097,25 +1452,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 全Particleを削除して最初の1個を生成する
 				particleSystem.Reset();
 			}
+			ImGui::PopID();
+			}
+
+			if (selectedObject == SelectedObject::ParticleSystem) {
+				ImGui::TextUnformatted("ParticleSystem");
+				ImGui::Separator();
+				ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem.GetParticleCount()));
+				ImGui::Text("Max Particle Count : %d", static_cast<int>(particleSystem.GetMaxParticleCount()));
+				ImGui::Text("Total Vertex Count : %d", static_cast<int>(particleSystem.GetTotalVertexCount()));
+				if (ImGui::Button("Reset Particles")) {
+					// Particleを1個の初期状態へ戻す
+					particleSystem.Reset();
+				}
+				ImGui::TextDisabled("Detailed execution is shown in Particle Flow.");
+			}
+
+			if (selectedObject == SelectedObject::None) {
+				ImGui::TextDisabled("Select an item in Hierarchy.");
+			}
 
 			// 区切り線
 			ImGui::Separator();
-
-			if (displayMode == 4) {
-				ImGui::Text("Triangle Count : %d",
-					static_cast<int>(particleSystem.GetParticleCount()));
-				ImGui::Text("Total Vertex Count : %d",
-					static_cast<int>(particleSystem.GetTotalVertexCount()));
-			}
-
-			const ParticleSystem::Particle* firstParticle = particleSystem.GetFirstParticle();
-			if (firstParticle != nullptr) {
-				ImGui::Text(
-					"Pos X: %.3f Y: %.3f",
-					firstParticle->position.x,
-					firstParticle->position.y
-				);
-			}
 
 			ImGui::End();
 #endif // USE_IMGUI
@@ -1151,10 +1509,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 描画先のRTVとDSVを設定する
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = depthStencilView.GetHandle();
-			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
+			D3D12_CPU_DESCRIPTOR_HANDLE gameRenderTarget = rtvHandles[backBufferIndex];
+#ifdef USE_IMGUI
+			// エディター有効時はゲームをScene用テクスチャへ描画する
+			sceneRenderTexture.TransitionToRenderTarget(commandList);
+			gameRenderTarget = sceneRenderTexture.GetRTVHandle();
+#endif // USE_IMGUI
+			commandList->OMSetRenderTargets(1, &gameRenderTarget, false, &dsvHandle);
 			// 指定した色で画面全体をクリアする
 			float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f}; // 青っぽい色。RGBAの順
-			commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+			commandList->ClearRenderTargetView(gameRenderTarget, clearColor, 0, nullptr);
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画用のDescriptorHeapの設定
@@ -1228,6 +1592,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
+			// ゲーム描画をImGuiから読める状態へ戻し、UIはSwapChainへ描画する
+			sceneRenderTexture.TransitionToShaderResource(commandList);
+			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
+			const float editorClearColor[] = {0.08f, 0.08f, 0.08f, 1.0f};
+			commandList->ClearRenderTargetView(
+				rtvHandles[backBufferIndex],
+				editorClearColor,
+				0,
+				nullptr
+			);
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 #endif // USE_IMGUI
 			// TransitionBarrerを張る
@@ -1247,6 +1621,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+	sceneRenderTexture.Finalize();
 #endif // USE_IMGUI
 
 	/// --- 解放処理 ---

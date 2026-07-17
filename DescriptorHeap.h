@@ -26,8 +26,17 @@ public:
 	// GPU側の先頭ハンドルを取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandleStart() const;
 
+	// 指定した番号のCPUディスクリプタハンドルを取得する
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(UINT descriptorIndex) const;
+
+	// 指定した番号のGPUディスクリプタハンドルを取得する
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(UINT descriptorIndex) const;
+
 	// Descriptor1個分のサイズを取得
 	UINT GetDescriptorSize() const { return descriptorSize_; }
+
+	// ヒープに確保したディスクリプタ数を取得する
+	UINT GetDescriptorCount() const { return descriptorCount_; }
 
 	/// --- 終了処理 ---
 	// DescriptorHeapを解放
@@ -36,4 +45,5 @@ public:
 private:
 	ID3D12DescriptorHeap* descriptorHeap_ = nullptr;
 	UINT descriptorSize_ = 0;
+	UINT descriptorCount_ = 0;
 };

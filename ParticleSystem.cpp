@@ -47,12 +47,19 @@ void ParticleSystem::Initialize(ID3D12Device* device, float fieldMin, float fiel
 /// --- 更新 ---
 // 移動、回転、壁反射、Particleの追加を行う
 void ParticleSystem::Update() {
+	// このフレームで通過した処理をParticle Flowパネル用に記録する
+	debugFlowState_ = {};
+	debugFlowState_.updateExecuted = true;
+	debugFlowState_.particleCountBefore = particles_.size();
+
 	if (particles_.empty()) {
 		Reset();
 	}
 
 	uint32_t spawnCount = 0;
 	const size_t updateParticleCount = particles_.size();
+	debugFlowState_.moveExecuted = updateParticleCount > 0;
+	debugFlowState_.collisionChecked = updateParticleCount > 0;
 
 	// 1_現在存在するParticleを移動する
 	for (size_t i = 0; i < updateParticleCount; ++i) {
@@ -62,6 +69,9 @@ void ParticleSystem::Update() {
 
 		// 2_壁に当たったParticleを反射する
 		const bool collided = ReflectAtFieldWall(particle);
+		if (collided) {
+			debugFlowState_.collisionCount++;
+		}
 
 		// 3_壁に当たった数だけ新しいParticleを追加する
 		if (collided && particles_.size() + spawnCount < maxParticleCount_) {
@@ -72,11 +82,14 @@ void ParticleSystem::Update() {
 	for (uint32_t i = 0; i < spawnCount; ++i) {
 		particles_.push_back(CreateParticle());
 	}
+	debugFlowState_.spawnCount = spawnCount;
 
 	// 4_最大数に到達したら全て削除して1個から再開する
 	if (particles_.size() >= maxParticleCount_) {
 		Reset();
 	}
+
+	debugFlowState_.particleCountAfter = particles_.size();
 }
 
 /// --- 頂点データ ---
@@ -131,6 +144,8 @@ void ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x
 /// --- リセット ---
 // 全Particleを削除して1個目を生成
 void ParticleSystem::Reset() {
+	// 手動Resetと最大数到達ResetのどちらもFlowパネルへ通知する
+	debugFlowState_.resetOccurred = true;
 	particles_.clear();
 	if (maxParticleCount_ > 0) {
 		particles_.push_back(CreateParticle());

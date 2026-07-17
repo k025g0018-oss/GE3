@@ -22,6 +22,18 @@ public:
 		float angularVelocity;
 	};
 
+	// Particle Flowパネルへ渡す1フレーム分の実行情報
+	struct DebugFlowState {
+		bool updateExecuted = false;
+		bool moveExecuted = false;
+		bool collisionChecked = false;
+		bool resetOccurred = false;
+		uint32_t collisionCount = 0;
+		uint32_t spawnCount = 0;
+		size_t particleCountBefore = 0;
+		size_t particleCountAfter = 0;
+	};
+
 	ParticleSystem() = default;
 	~ParticleSystem();
 
@@ -58,6 +70,12 @@ public:
 	// 先頭のParticleを取得
 	const Particle* GetFirstParticle() const;
 
+	// Particle Flowパネル用の実行情報を取得する
+	const DebugFlowState& GetDebugFlowState() const { return debugFlowState_; }
+
+	// 設定されているParticle最大数を取得する
+	uint32_t GetMaxParticleCount() const { return maxParticleCount_; }
+
 	/// --- 終了処理 ---
 	// Particle用のWVPResourceを解放
 	void Finalize();
@@ -78,6 +96,7 @@ private:
 	float fieldMin_ = -0.9f;
 	float fieldMax_ = 0.9f;
 	uint32_t maxParticleCount_ = 0;
+	DebugFlowState debugFlowState_{};
 
 	ID3D12Resource* particleWvpResource_ = nullptr;
 	uint8_t* particleWvpData_ = nullptr;
