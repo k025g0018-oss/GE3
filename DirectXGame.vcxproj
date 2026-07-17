@@ -121,11 +121,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="DepthStencilView.cpp" />
     <ClCompile Include="DescriptorHeap.cpp" />
     <ClCompile Include="DxcCompiler.cpp" />
-	<ClCompile Include="EditorObject.cpp" />
+    <ClCompile Include="EditorObject.cpp" />
     <ClCompile Include="InputLayout.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
-	<ClCompile Include="Object3D.cpp" />
+    <ClCompile Include="Object3D.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="RasterizerState.cpp" />
@@ -133,6 +133,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="SceneRenderTexture.cpp" />
     <ClCompile Include="ShaderProgram.cpp" />
     <ClCompile Include="ShaderResourceView.cpp" />
+    <ClCompile Include="Sphere.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Vector.cpp" />
@@ -161,7 +162,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="DepthStencilView.h" />
     <ClInclude Include="DescriptorHeap.h" />
     <ClInclude Include="DxcCompiler.h" />
-	<ClInclude Include="EditorObject.h" />
+    <ClInclude Include="EditorObject.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -173,7 +174,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="InputLayout.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Logger.h" />
-	<ClInclude Include="Object3D.h" />
+    <ClInclude Include="Object3D.h" />
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="RasterizerState.h" />
@@ -181,6 +182,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="SceneRenderTexture.h" />
     <ClInclude Include="ShaderProgram.h" />
     <ClInclude Include="ShaderResourceView.h" />
+    <ClInclude Include="Sphere.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="Vector.h" />

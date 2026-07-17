@@ -28,6 +28,7 @@
 #include "Sprite.h"
 #include "TextureManager.h"
 #include "VertexBuffer.h"
+#include "Sphere.h"
 
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
@@ -984,11 +985,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	scissorRect.top = 0;
 	scissorRect.bottom = kClientHeight;
 
-	/// --- 文字列 ---
+	///// ----- 文字列 ----- /////
 	// メッセージ構造体
 	MSG msg{};
 
-	/// ---変数の宣言---
+	///// ----- 変数の宣言 ----- /////
 	/// 三角形
 	// Transformの変数を作る
 	// 3Dオブジェクトの状態をObject3Dへ集約し、既存の描画処理から参照して使う
@@ -1041,6 +1042,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Matrix4x4 viewMatrix = Matrix4x4::Inverse(cameraMatrix);
 
 	Matrix4x4 projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+
+	/// --- 球 ---
+	Sphere sphere;
+
+	// ImGuiでは1～32分割まで変更できるようにする
+	sphere.Initialize(device, 32);
 
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
@@ -1113,7 +1120,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	IEditorObject* selectedObject = nullptr;
 #endif // USE_IMGUI
 
-	/// --- メインループ ---
+	///// ----- メインループ ----- /////
 	// ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT) {
 		//windowにメッセージが来てたら最優先で処理させる
@@ -1121,7 +1128,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
-			/// --- ImGui先頭 ---
+			///// ----- ImGui先頭 ----- /////
 #ifdef USE_IMGUI
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
@@ -1137,12 +1144,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			DrawFlowGraph(particleSystem, object3D);
 #endif // USE_IMGUI
 
-			/// --- ゲームの処理 ---
+			///// ----- ゲームの処理 ----- /////
 			// 回転角を更新
 			// Start中だけObject3D自身が回転状態を更新する
 			object3D.Update();
 
-			// --- モードに応じた頂点データの書き込み ---
+			/// --- モードに応じた頂点データの書き込み ---
 			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
 			const int renderingMode = displayMode;
 			uint32_t drawVertexCount = 3; // デフォルト
@@ -1322,7 +1329,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				particleSystem.Update();
 			}
 
-			/// --- 行列の計算 ---
+			///// ----- 行列の計算 ----- /////
 			// ワールド行列の更新
 			worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
@@ -1334,6 +1341,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// プロジェクション行列の更新
 			projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+
+			// 球の行列の更新
+			sphere.Update(
+				viewMatrix,
+				projectionMatrix
+			);
 
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
@@ -1562,14 +1575,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// ImGuiで変更されたSpriteのSRTからWVPを更新する
 			sprite.Update();
 
-			/// --- ImGui終わり ---
+			///// ----- ImGui終わり ----- /////
 #ifdef USE_IMGUI
 			// 内部コマンドを生成する
 			ImGui::Render();
 #endif // USE_IMGUI
 
 #pragma region
-			/// --- コマンドを積む ---
+			///// ----- コマンドを積む ----- /////
 			// これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -1657,6 +1670,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			///// ----- Sprite描画 ----- /////
 
+			/// --- Sphere描画 ---
+			const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
+				textureManager.GetSrvHandle(1);
+
+			// 行列やResource設定はSphere内で管理する
+			sphere.Draw(
+				commandList,
+				sphereTextureHandle
+			);
+
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
 			const D3D12_GPU_DESCRIPTOR_HANDLE spriteTextureHandle =
@@ -1705,9 +1728,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	sceneRenderTexture.Finalize();
 #endif // USE_IMGUI
 
-	/// --- 解放処理 ---
-	// 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前)
+	///// ----- 解放処理 ----- /////
+	/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
 	vertexBuffer.Finalize();
+	// 球
+	sphere.Finalize();
 	sprite.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();
@@ -1716,16 +1741,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	textureManager.Finalize();
 	depthStencilView.Finalize();
 
-	// 2_PSOとコマンド関連は各クラスが解放する
+	/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 	pipelineState.Finalize();
 	commandContext.Finalize();
 
-	// 4_ディスクリプタヒープ
+	/// --- 4_ディスクリプタヒープ ---
 	rtvDescriptorHeap.Finalize();
 	srvDescriptorHeap.Finalize();
 	dsvDescriptorHeap.Finalize();
-
-	// 5_スワップチェーンとバックバッファリソース
+	
+	/// --- 5_スワップチェーンとバックバッファリソース ///
 	swapChainResources[0]->Release();
 	swapChainResources[1]->Release();
 	swapChain->Release();
@@ -1734,7 +1759,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	debugController->Release();
 #endif // _DEBUG
 
-	// 8_すべての依存リソースが消えたので解放
+	/// --- 8_すべての依存リソースが消えたので解放 ---
 	device->Release();
 	useAdapter->Release();
 	dxgiFactory->Release();
