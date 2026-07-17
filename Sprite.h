@@ -8,13 +8,13 @@
 
 ///// ----- Sprite ----- /////
 
-class Sprite {
+class Sprite2D {
 public:
-	Sprite() = default;
-	~Sprite();
+	Sprite2D() = default;
+	~Sprite2D();
 
-	Sprite(const Sprite&) = delete;
-	Sprite& operator=(const Sprite&) = delete;
+	Sprite2D(const Sprite2D&) = delete;
+	Sprite2D& operator=(const Sprite2D&) = delete;
 
 	/// --- 初期化 ---
 	// Sprite用の頂点、Material、WVPを作成

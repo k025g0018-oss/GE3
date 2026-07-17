@@ -6,13 +6,13 @@
 
 ///// ----- Sprite ----- /////
 
-Sprite::~Sprite() {
+Sprite2D::~Sprite2D() {
 	Finalize();
 }
 
 /// --- 初期化 ---
 // Sprite用の頂点、Material、WVPを作成
-void Sprite::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t clientHeight, float spriteWidth, float spriteHeight) {
+void Sprite2D::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t clientHeight, float spriteWidth, float spriteHeight) {
 	assert(device != nullptr);
 	assert(clientWidth > 0);
 	assert(clientHeight > 0);
@@ -53,7 +53,7 @@ void Sprite::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t cli
 
 /// --- 更新 ---
 // SRTと正射影行列からWVPを更新
-void Sprite::Update() {
+void Sprite2D::Update() {
 	assert(wvpData_ != nullptr);
 
 	// SpriteのSRTからWorld行列を作成
@@ -84,7 +84,7 @@ void Sprite::Update() {
 
 /// --- 描画 ---
 // Sprite用のリソースを設定して2つの三角形を描画
-void Sprite::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) const {
+void Sprite2D::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) const {
 	assert(commandList != nullptr);
 
 	// Sprite専用のVertexBufferViewを設定
@@ -104,7 +104,7 @@ void Sprite::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_H
 
 /// --- リセット ---
 // SRTと色を初期値へ戻す
-void Sprite::Reset() {
+void Sprite2D::Reset() {
 	transform_.scale = {1.0f, 1.0f, 1.0f};
 	transform_.rotate = {0.0f, 0.0f, 0.0f};
 	transform_.translate = {0.0f, 0.0f, 0.0f};
@@ -116,7 +116,7 @@ void Sprite::Reset() {
 
 /// --- 終了処理 ---
 // Spriteが所有するリソースを解放
-void Sprite::Finalize() {
+void Sprite2D::Finalize() {
 	vertexBuffer_.Finalize();
 
 	materialData_ = nullptr;

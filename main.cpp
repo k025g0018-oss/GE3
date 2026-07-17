@@ -13,7 +13,7 @@
 #include <dxgidebug.h>
 #include <dxcapi.h>
 #include "Matrix4x4.h"
-#include "Object3D.h"
+#include "Primitive3D.h"
 #include "Vector.h"
 #include "BufferResource.h"
 #include "Collision.h"
@@ -29,6 +29,7 @@
 #include "TextureManager.h"
 #include "VertexBuffer.h"
 #include "Sphere.h"
+#include "Camera.h"
 
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
@@ -39,6 +40,7 @@
 // ImGui
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
+#include "externals/imgui/imgui_internal.h"
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
@@ -138,15 +140,41 @@ struct ImGuiSrvDescriptorAllocator {
 	}
 };
 
+// 起動時にViewportの比率からDock配置を作り、ウィンドウサイズ変更にも追従させる
+void SetupDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& viewportSize) {
+	ImGui::DockBuilderRemoveNode(dockspaceId);
+	ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+	ImGui::DockBuilderSetNodeSize(dockspaceId, viewportSize);
+
+	ImGuiID centerDockId = dockspaceId;
+	ImGuiID leftDockId = 0;
+	ImGuiID rightDockId = 0;
+	ImGuiID bottomDockId = 0;
+
+	// 左18%、右22%、下25%を補助パネルとして確保し、中央をSceneにする
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Left, 0.18f, &leftDockId, &centerDockId);
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Right, 0.22f, &rightDockId, &centerDockId);
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Down, 0.25f, &bottomDockId, &centerDockId);
+
+	ImGuiID leftBottomDockId = 0;
+	ImGuiID rightBottomDockId = 0;
+	ImGui::DockBuilderSplitNode(leftDockId, ImGuiDir_Down, 0.50f, &leftBottomDockId, &leftDockId);
+	ImGui::DockBuilderSplitNode(rightDockId, ImGuiDir_Down, 0.50f, &rightBottomDockId, &rightDockId);
+
+	ImGui::DockBuilderDockWindow("Hierarchy", leftDockId);
+	ImGui::DockBuilderDockWindow("Flow Graph", leftBottomDockId);
+	ImGui::DockBuilderDockWindow("Scene", centerDockId);
+	ImGui::DockBuilderDockWindow("Content Browser", bottomDockId);
+	ImGui::DockBuilderDockWindow("Properties", rightDockId);
+	ImGui::DockBuilderDockWindow("Statistics", rightBottomDockId);
+	ImGui::DockBuilderFinish(dockspaceId);
+}
+
 // 選択結果をPropertiesへ渡せるように参照で受け取る
 void DrawHierarchy(const std::vector<IEditorObject*>& editorObjects, IEditorObject*& selectedObject) {
 	ImGui::Begin("Hierarchy");
 	for (IEditorObject* editorObject : editorObjects) {
-#if 0
-	// ラッパーを一覧へ追加するだけでHierarchyにも反映される
-	for (IEditorObject* editorObject : editorObjects) {
-		if (ImGui::Selectable(editorObject->GetName(), selectedObject == editorObject)) {
-#endif
+		// ラッパーを一覧へ追加するだけでHierarchyにも反映される
 		if (ImGui::Selectable(editorObject->GetName(), selectedObject == editorObject)) {
 			selectedObject = editorObject;
 		}
@@ -154,8 +182,8 @@ void DrawHierarchy(const std::vector<IEditorObject*>& editorObjects, IEditorObje
 	ImGui::End();
 }
 
-// Hierarchyで選択中の項目名をSceneとPropertiesで共有する
 #if 0
+// 旧SelectedObject列挙型を使用する場合の名前変換処理として残す
 const char* GetSelectedObjectName(SelectedObject selectedObject) {
 	switch (selectedObject) {
 		case SelectedObject::Pyramid:
@@ -172,24 +200,54 @@ const char* GetSelectedObjectName(SelectedObject selectedObject) {
 }
 #endif
 
-// Scene用レンダーテクスチャをパネル内へ表示する
-void DrawScene(D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle, const IEditorObject* selectedObject) {
+// Scene用レンダーテクスチャをパネル内へ表示する カメラ操作
+bool DrawScene(
+	D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle,
+	const IEditorObject * selectedObject
+) {
 	ImGui::Begin("Scene");
-	ImGui::Text("Selected : %s", selectedObject ? selectedObject->GetName() : "None");
-	const ImVec2 panelSize = ImGui::GetContentRegionAvail();
-	if (panelSize.x > 0.0f && panelSize.y > 0.0f) {
-		// Scene用SRVをImGuiの画像としてパネル全体へ表示する
-		const ImTextureRef sceneTexture(static_cast<ImTextureID>(sceneSrvHandle.ptr));
-		ImGui::Image(sceneTexture, panelSize);
+
+	ImGui::Text(
+		"Selected : %s",
+		selectedObject
+		? selectedObject->GetName()
+		: "None"
+	);
+
+	const ImVec2 panelSize =
+		ImGui::GetContentRegionAvail();
+
+	if (panelSize.x > 0.0f &&
+		panelSize.y > 0.0f) {
+
+		const ImTextureRef sceneTexture(
+			static_cast<ImTextureID>(
+			sceneSrvHandle.ptr
+		)
+		);
+
+		ImGui::Image(
+			sceneTexture,
+			panelSize
+		);
 	}
+
+	// Sceneウィンドウ上だけカメラ操作を有効にする
+	const bool isSceneHovered =
+		ImGui::IsWindowHovered(
+			ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
+		);
+
 	ImGui::End();
+
+	return isSceneHovered;
 }
 
 // Particle Flow内の1ノードを描画する
 void DrawParticleFlowNode(
-	ImDrawList* drawList,
-	const ImVec2& position,
-	const ImVec2& size,
+	ImDrawList * drawList,
+	const ImVec2 & position,
+	const ImVec2 & size,
 	const char* label,
 	bool active,
 	bool eventActive = false
@@ -212,7 +270,7 @@ void DrawParticleFlowNode(
 }
 
 // ノード間の処理順を矢印で描画する
-void DrawParticleFlowArrow(ImDrawList* drawList, const ImVec2& from, const ImVec2& to, bool active) {
+void DrawParticleFlowArrow(ImDrawList * drawList, const ImVec2 & from, const ImVec2 & to, bool active) {
 	const ImU32 color = active ? IM_COL32(95, 225, 140, 255) : IM_COL32(115, 120, 130, 255);
 	drawList->AddLine(from, to, color, active ? 3.0f : 2.0f);
 	const float direction = to.x >= from.x ? 1.0f : -1.0f;
@@ -225,7 +283,7 @@ void DrawParticleFlowArrow(ImDrawList* drawList, const ImVec2& from, const ImVec
 }
 
 // ParticleSystemの実行順と直近イベントを読み取り専用で可視化する
-void DrawParticleFlow(const ParticleSystem& particleSystem) {
+void DrawParticleFlow(const ParticleSystem & particleSystem) {
 	ImGui::Begin("Particle Flow");
 	const ParticleSystem::DebugFlowState& state = particleSystem.GetDebugFlowState();
 
@@ -274,7 +332,7 @@ void DrawParticleFlow(const ParticleSystem& particleSystem) {
 }
 
 // ノードをInvisibleButtonとして登録し、ドラッグ操作で位置を更新する
-void DrawDraggableNode(const char* id, const char* label, ImVec2& position, bool active) {
+void DrawDraggableNode(const char* id, const char* label, ImVec2 & position, bool active) {
 	const ImVec2 nodeSize(135.0f, 46.0f);
 	ImGui::SetCursorScreenPos(position);
 	ImGui::PushID(id);
@@ -292,7 +350,7 @@ void DrawDraggableNode(const char* id, const char* label, ImVec2& position, bool
 	ImGui::PopID();
 }
 
-void DrawFlowConnection(const ImVec2& fromNode, const ImVec2& toNode, bool active) {
+void DrawFlowConnection(const ImVec2 & fromNode, const ImVec2 & toNode, bool active) {
 	const ImVec2 nodeSize(135.0f, 46.0f);
 	DrawParticleFlowArrow(
 		ImGui::GetWindowDrawList(),
@@ -300,7 +358,7 @@ void DrawFlowConnection(const ImVec2& fromNode, const ImVec2& toNode, bool activ
 		ImVec2(toNode.x, toNode.y + nodeSize.y * 0.5f), active);
 }
 
-void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3D) {
+void DrawFlowGraph(const ParticleSystem & particleSystem, const Primitive3D & primitive3D) {
 	ImGui::Begin("Flow Graph");
 	ImGui::TextDisabled("Drag nodes with the left mouse button. Connections visualize processing order.");
 	if (ImGui::BeginTabBar("FlowTabs")) {
@@ -308,7 +366,9 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			static ImVec2 positions[] = {{20, 35}, {190, 35}, {360, 35}, {530, 35}, {530, 125}, {360, 125}, {190, 125}};
 			ImVec2 p[7];
-			for (int i = 0; i < 7; ++i) { p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y); }
+			for (int i = 0; i < 7; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
 			const auto& state = particleSystem.GetDebugFlowState();
 			DrawDraggableNode("ParticleUpdate", "1. Update", p[0], state.updateExecuted);
 			DrawDraggableNode("ParticleMove", "2. Move / Rotate", p[1], state.moveExecuted);
@@ -317,8 +377,12 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3
 			DrawDraggableNode("ParticleSpawn", "5. Spawn", p[4], state.spawnCount > 0);
 			DrawDraggableNode("ParticleMax", "6. Max Check", p[5], state.updateExecuted);
 			DrawDraggableNode("ParticleReset", "7. Reset", p[6], state.resetOccurred);
-			for (int i = 0; i < 7; ++i) { positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y); }
-			for (int i = 0; i < 6; ++i) { DrawFlowConnection(p[i], p[i + 1], i < 2 ? state.updateExecuted : state.collisionCount > 0); }
+			for (int i = 0; i < 7; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
+			for (int i = 0; i < 6; ++i) {
+				DrawFlowConnection(p[i], p[i + 1], i < 2 ? state.updateExecuted : state.collisionCount > 0);
+			}
 			ImGui::Dummy(ImVec2(700.0f, 210.0f));
 			ImGui::EndTabItem();
 		}
@@ -326,15 +390,19 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			static ImVec2 positions[] = {{20, 55}, {190, 55}, {360, 55}, {530, 55}};
 			ImVec2 p[4];
-			for (int i = 0; i < 4; ++i) { p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y); }
+			for (int i = 0; i < 4; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
 			DrawDraggableNode("ObjectDisplay", "Display", p[0], true);
-			DrawDraggableNode("ObjectStart", "Start", p[1], object3D.IsPlaying());
-			DrawDraggableNode("ObjectMove", "Move / Rotate", p[2], object3D.IsPlaying());
-			DrawDraggableNode("ObjectStop", "Stop", p[3], !object3D.IsPlaying());
-			for (int i = 0; i < 4; ++i) { positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y); }
+			DrawDraggableNode("ObjectStart", "Start", p[1], primitive3D.IsPlaying());
+			DrawDraggableNode("ObjectMove", "Move / Rotate", p[2], primitive3D.IsPlaying());
+			DrawDraggableNode("ObjectStop", "Stop", p[3], !primitive3D.IsPlaying());
+			for (int i = 0; i < 4; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
 			DrawFlowConnection(p[0], p[1], true);
-			DrawFlowConnection(p[1], p[2], object3D.IsPlaying());
-			DrawFlowConnection(p[2], p[3], !object3D.IsPlaying());
+			DrawFlowConnection(p[1], p[2], primitive3D.IsPlaying());
+			DrawFlowConnection(p[2], p[3], !primitive3D.IsPlaying());
 			ImGui::Dummy(ImVec2(700.0f, 160.0f));
 			ImGui::EndTabItem();
 		}
@@ -342,11 +410,15 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			static ImVec2 positions[] = {{20, 55}, {210, 55}, {400, 55}};
 			ImVec2 p[3];
-			for (int i = 0; i < 3; ++i) { p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y); }
+			for (int i = 0; i < 3; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
 			DrawDraggableNode("SpriteInitialize", "Initialize", p[0], true);
 			DrawDraggableNode("SpriteUpdate", "Update", p[1], true);
 			DrawDraggableNode("SpriteDraw", "Draw / Display", p[2], true);
-			for (int i = 0; i < 3; ++i) { positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y); }
+			for (int i = 0; i < 3; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
 			DrawFlowConnection(p[0], p[1], true);
 			DrawFlowConnection(p[1], p[2], true);
 			ImGui::Dummy(ImVec2(600.0f, 160.0f));
@@ -358,26 +430,70 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Object3D& object3
 }
 
 // 描画統計を表示する
-void DrawStatistics(const ParticleSystem& particleSystem) {
+void DrawStatistics(
+	const ParticleSystem & particleSystem,
+	Camera & camera
+) {
 	ImGui::Begin("Statistics");
-	ImGui::Text("FPS : %.1f", ImGui::GetIO().Framerate);
-	ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem.GetParticleCount()));
-	ImGui::Text("Total Vertex Count : %d", static_cast<int>(particleSystem.GetTotalVertexCount()));
 
-	const ParticleSystem::Particle* firstParticle = particleSystem.GetFirstParticle();
-	if (firstParticle != nullptr) {
-		ImGui::Separator();
-		ImGui::Text(
-			"First Particle Pos X: %.3f Y: %.3f",
-			firstParticle->position.x,
-			firstParticle->position.y
-		);
+	ImGui::Text(
+		"FPS : %.1f",
+		ImGui::GetIO().Framerate
+	);
+
+	ImGui::Text(
+		"Particle Count : %d",
+		static_cast<int>(
+		particleSystem.GetParticleCount()
+	)
+	);
+
+	ImGui::Text(
+		"Total Vertex Count : %d",
+		static_cast<int>(
+		particleSystem.GetTotalVertexCount()
+	)
+	);
+
+	ImGui::Separator();
+
+	// Cameraは頻繁に確認するためStatisticsへ常時表示する
+	ImGui::TextUnformatted("Camera");
+
+	Transform& cameraTransform =
+		camera.GetTransform();
+
+	ImGui::DragFloat3(
+		"Camera Translate",
+		&cameraTransform.translate.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Camera Rotate",
+		&cameraTransform.rotate.x,
+		0.01f
+	);
+
+	if (ImGui::Button("Reset Camera")) {
+		camera.Reset();
 	}
+
+	ImGui::TextDisabled(
+		"Scene Left Drag : Rotate"
+	);
+	ImGui::TextDisabled(
+		"Scene Right Drag : Move"
+	);
+	ImGui::TextDisabled(
+		"Scene Wheel : Zoom"
+	);
+
 	ImGui::End();
 }
 
 // 指定されたフォルダの中身だけを再帰的に表示する
-void DrawDirectoryTree(const std::filesystem::path& directory) {
+void DrawDirectoryTree(const std::filesystem::path & directory) {
 	std::error_code error;
 
 	for (const auto& entry :
@@ -420,9 +536,9 @@ void DrawContentBrowser() {
 
 // TextureManagerへ読み込み済みのPNGなら、対応するSRVを返す
 bool TryGetLoadedTexture(
-	const std::filesystem::path& path,
-	const TextureManager& textureManager,
-	D3D12_GPU_DESCRIPTOR_HANDLE& srvHandle
+	const std::filesystem::path & path,
+	const TextureManager & textureManager,
+	D3D12_GPU_DESCRIPTOR_HANDLE & srvHandle
 ) {
 	const std::string fileName = path.filename().string();
 	if (fileName == "white.png") {
@@ -441,7 +557,7 @@ bool TryGetLoadedTexture(
 }
 
 // 拡張子に合わせた紙アイコンをDear ImGuiの図形で描く
-void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2& size) {
+void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2 & size) {
 	ImGui::InvisibleButton(id, size);
 	ImDrawList* drawList = ImGui::GetWindowDrawList();
 	const ImVec2 min = ImGui::GetItemRectMin();
@@ -466,9 +582,9 @@ void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec
 
 // フォルダまたはファイルの種類に合ったアイコンを表示する
 bool DrawContentBrowserIcon(
-	const std::filesystem::directory_entry& entry,
-	const TextureManager& textureManager,
-	const ImVec2& iconSize
+	const std::filesystem::directory_entry & entry,
+	const TextureManager & textureManager,
+	const ImVec2 & iconSize
 ) {
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
 	if (!entry.is_directory() && TryGetLoadedTexture(entry.path(), textureManager, textureHandle)) {
@@ -494,7 +610,7 @@ bool DrawContentBrowserIcon(
 }
 
 // ソリューション内のフォルダとファイルを、アイコン付きで表示する
-void DrawContentBrowserAssets(const TextureManager& textureManager) {
+void DrawContentBrowserAssets(const TextureManager & textureManager) {
 	ImGui::Begin("Content Browser");
 
 	static std::filesystem::path currentDirectory = ".";
@@ -864,8 +980,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/// --- 初期化 ---
 	// Sprite専用のVertexBuffer、Material、WVPを作成
-	Sprite sprite;
-	sprite.Initialize(device, kClientWidth, kClientHeight, 640.0f, 360.0f);
+	// 2D専用オブジェクトであることが分かる名前に統一する
+	Sprite2D sprite2D;
+	sprite2D.Initialize(device, kClientWidth, kClientHeight, 640.0f, 360.0f);
 
 	// 三角形とは別にSpriteのTextureを選択する
 	int spriteTextureMode = 1;
@@ -985,6 +1102,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	scissorRect.top = 0;
 	scissorRect.bottom = kClientHeight;
 
+	// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
+	uint32_t backBufferWidth = kClientWidth;
+	uint32_t backBufferHeight = kClientHeight;
+	D3D12_VIEWPORT editorViewport = viewport;
+	D3D12_RECT editorScissorRect = scissorRect;
+
 	///// ----- 文字列 ----- /////
 	// メッセージ構造体
 	MSG msg{};
@@ -993,33 +1116,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// 三角形
 	// Transformの変数を作る
 	// 3Dオブジェクトの状態をObject3Dへ集約し、既存の描画処理から参照して使う
-	Object3D object3D;
-	Transform& transform = object3D.GetTransform();
+	Primitive3D primitive3D;
+	primitive3D.Initialize(device);
+	Transform& transform = primitive3D.GetTransform();
 
 	// カメラの回転
-	bool& isAutoRotate = object3D.GetIsPlaying();
+	bool& isAutoRotate = primitive3D.GetIsPlaying();
 
 	// 描画モード
-	int& displayMode = object3D.GetDisplayMode();
+	int& displayMode = primitive3D.GetDisplayMode();
 
 	// モード1で使う
-	float* t1_Scale = object3D.GetTriangle1Scale();
-	float* t1_Rotate = object3D.GetTriangle1Rotate();
-	float* t1_Translate = object3D.GetTriangle1Translate();
+	float* t1_Scale = primitive3D.GetTriangle1Scale();
+	float* t1_Rotate = primitive3D.GetTriangle1Rotate();
+	float* t1_Translate = primitive3D.GetTriangle1Translate();
 
-	float* t2_Scale = object3D.GetTriangle2Scale();
-	float* t2_Rotate = object3D.GetTriangle2Rotate();
-	float* t2_Translate = object3D.GetTriangle2Translate();
+	float* t2_Scale = primitive3D.GetTriangle2Scale();
+	float* t2_Rotate = primitive3D.GetTriangle2Rotate();
+	float* t2_Translate = primitive3D.GetTriangle2Translate();
 
 	// モード3で使う
 	// 三角錐1個目
-	float* p1_Scale = object3D.GetPyramid1Scale();
-	float* p1_Rotate = object3D.GetPyramid1Rotate();
-	float* p1_Translate = object3D.GetPyramid1Translate();
+	float* p1_Scale = primitive3D.GetPyramid1Scale();
+	float* p1_Rotate = primitive3D.GetPyramid1Rotate();
+	float* p1_Translate = primitive3D.GetPyramid1Translate();
 	// 三角錐2個目
-	float* p2_Scale = object3D.GetPyramid2Scale();
-	float* p2_Rotate = object3D.GetPyramid2Rotate();
-	float* p2_Translate = object3D.GetPyramid2Translate();
+	float* p2_Scale = primitive3D.GetPyramid2Scale();
+	float* p2_Rotate = primitive3D.GetPyramid2Rotate();
+	float* p2_Translate = primitive3D.GetPyramid2Translate();
 
 	///// ----- ParticleSystem ----- /////
 
@@ -1028,20 +1152,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ParticleSystem particleSystem;
 	particleSystem.Initialize(device, -0.9f, 0.9f, 50);
 
-	/// カメラ
-	Transform cameraTransform{
-		{1.0f, 1.0f, 1.0f},
-		{0.0f, 0.0f, 0.0f},
-		{0.0f, 0.0f, -5.0f}
-	};
+	/// --- カメラ ---
+	Camera camera;
 
-	Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	camera.Initialize(
+		float(kClientWidth) /
+		float(kClientHeight)
+	);
 
-	Matrix4x4 cameraMatrix = Matrix4x4::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-
-	Matrix4x4 viewMatrix = Matrix4x4::Inverse(cameraMatrix);
-
-	Matrix4x4 projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+	// Object3D用のWorld行列
+	Matrix4x4 worldMatrix =
+		Matrix4x4::MakeAffineMatrix(
+			transform.scale,
+			transform.rotate,
+			transform.translate
+		);
 
 	/// --- 球 ---
 	Sphere sphere;
@@ -1094,7 +1219,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	) {
 		auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
 		allocator->Allocate(cpuHandle, gpuHandle);
-	};
+		};
 	initInfo.SrvDescriptorFreeFn = [](
 		ImGui_ImplDX12_InitInfo* info,
 		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
@@ -1102,7 +1227,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	) {
 		auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
 		allocator->Free(cpuHandle, gpuHandle);
-	};
+		};
 
 	// 新しいDirectX 12バックエンド初期化形式を使用する
 	ImGui_ImplDX12_Init(&initInfo);
@@ -1110,12 +1235,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	io.Fonts->Build();
 
 	// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
-	Object3DEditorObject object3DEditor(object3D, *materialData, textureMode, particleSystem);
-	SpriteEditorObject spriteEditor(sprite, spriteTextureMode);
+	Primitive3DEditorObject primitive3DEditor(primitive3D, textureMode, particleSystem);
+	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode);
 	ParticleEditorObject particleEditor(particleSystem);
-	SceneSettingsEditorObject sceneSettingsEditor(object3D);
+	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
 	std::vector<IEditorObject*> editorObjects = {
-		&object3DEditor, &spriteEditor, &particleEditor, &sceneSettingsEditor
+		&primitive3DEditor, &sprite2DEditor, &particleEditor, &sceneSettingsEditor
 	};
 	IEditorObject* selectedObject = nullptr;
 #endif // USE_IMGUI
@@ -1128,34 +1253,134 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+			// WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+			RECT clientRect{};
+			GetClientRect(hwnd, &clientRect);
+			const uint32_t clientWidth = static_cast<uint32_t>(clientRect.right - clientRect.left);
+			const uint32_t clientHeight = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+			if (clientWidth == 0 || clientHeight == 0) {
+				continue;
+			}
+
+			if (clientWidth != backBufferWidth || clientHeight != backBufferHeight) {
+				// ResizeBuffers前にGPUのBackBuffer参照を完了させる
+				commandContext.ExecuteAndWait();
+				for (ID3D12Resource*& backBuffer : swapChainResources) {
+					if (backBuffer != nullptr) {
+						backBuffer->Release();
+						backBuffer = nullptr;
+					}
+				}
+
+				HRESULT resizeResult = swapChain->ResizeBuffers(
+					swapChainDesc.BufferCount,
+					clientWidth,
+					clientHeight,
+					swapChainDesc.Format,
+					0
+				);
+				assert(SUCCEEDED(resizeResult));
+
+				for (uint32_t index = 0; index < swapChainDesc.BufferCount; ++index) {
+					resizeResult = swapChain->GetBuffer(index, IID_PPV_ARGS(&swapChainResources[index]));
+					assert(SUCCEEDED(resizeResult));
+					device->CreateRenderTargetView(swapChainResources[index], &rtvDesc, rtvHandles[index]);
+				}
+				backBufferWidth = clientWidth;
+				backBufferHeight = clientHeight;
+				editorViewport.Width = static_cast<float>(clientWidth);
+				editorViewport.Height = static_cast<float>(clientHeight);
+				editorScissorRect.right = static_cast<LONG>(clientWidth);
+				editorScissorRect.bottom = static_cast<LONG>(clientHeight);
+				camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+			}
+
 			///// ----- ImGui先頭 ----- /////
 #ifdef USE_IMGUI
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-			// 画面全体を各エディターパネルの配置領域として使用する
-			ImGui::DockSpaceOverViewport();
+			// メインViewport全体をDock領域にして、最大化やサイズ変更へ追従させる
+			const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+			const ImGuiID dockspaceId = ImGui::GetID("MainEditorDockSpace");
+
+			// サイズ変更中も右側・下側が画面外へ押し出されないよう、現在サイズで比率を再計算する
+			static ImVec2 previousViewportSize(0.0f, 0.0f);
+			const bool isViewportSizeChanged =
+				previousViewportSize.x != mainViewport->Size.x ||
+				previousViewportSize.y != mainViewport->Size.y;
+			if (isViewportSizeChanged) {
+				SetupDefaultDockLayout(dockspaceId, mainViewport->Size);
+				previousViewportSize = mainViewport->Size;
+			}
+
+			// Dockノードを組み直したあとにViewportへ登録する
+			ImGui::DockSpaceOverViewport(dockspaceId, mainViewport);
 
 			DrawHierarchy(editorObjects, selectedObject);
-			DrawScene(sceneRenderTexture.GetSRVHandle(), selectedObject);
+
+			const bool isSceneHovered =
+				DrawScene(
+					sceneRenderTexture.GetSRVHandle(),
+					selectedObject
+				);
+
+			if (isSceneHovered) {
+				ImGuiIO& io = ImGui::GetIO();
+
+				const Vector2 mouseDelta = {
+					io.MouseDelta.x,
+					io.MouseDelta.y
+				};
+
+				// Scene上の左ドラッグでCameraを回転する
+				if (ImGui::IsMouseDragging(
+					ImGuiMouseButton_Left
+					)) {
+					camera.RotateByMouse(mouseDelta);
+				}
+
+				// Scene上の右ドラッグでCameraを平行移動する
+				if (ImGui::IsMouseDragging(
+					ImGuiMouseButton_Right
+					)) {
+					camera.MoveByMouse(mouseDelta);
+				}
+
+				// Scene上のホイールでCameraを前後移動する
+				if (io.MouseWheel != 0.0f) {
+					camera.ZoomByMouse(io.MouseWheel);
+				}
+			}
+
 			DrawContentBrowserAssets(textureManager);
-			DrawStatistics(particleSystem);
-			DrawFlowGraph(particleSystem, object3D);
+			DrawStatistics(particleSystem, camera);
+			DrawFlowGraph(particleSystem, primitive3D);
+
 #endif // USE_IMGUI
 
 			///// ----- ゲームの処理 ----- /////
+			/// --- カメラ ---
+			camera.Update();
+
 			// 回転角を更新
 			// Start中だけObject3D自身が回転状態を更新する
-			object3D.Update();
+			// Primitive3Dの更新はCamera行列取得後に行う
 
 			/// --- モードに応じた頂点データの書き込み ---
 			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
 			const int renderingMode = displayMode;
+			// Primitive3Dへ移動する前の頂点生成処理は、比較できるよう残して無効化する
+#if 0
 			uint32_t drawVertexCount = 3; // デフォルト
 
 			if (renderingMode == 0) {
-				// 0: 三角形1枚
+				// None：Object3Dの頂点を作成しない
+				drawVertexCount = 0;
+
+			} else if (renderingMode == 1) {
+				// 1: 三角形1枚
 				drawVertexCount = 3;
 				VertexData triangleVertices[3] = {
 					{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
@@ -1165,8 +1390,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
 					vertexData[i] = triangleVertices[i];
 				}
-			} else if (renderingMode == 1) {
-				// 1: 三角形2枚 (個別SRT)
+			} else if (renderingMode == 2) {
+				// 2: 三角形2枚 (個別SRT)
 				drawVertexCount = 6;
 				// 三角形1個目
 				vertexData[0].position = {-0.5f, -0.5f, 0.0f, 1.0f};
@@ -1248,8 +1473,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					// 計算結果を上書き保存
 					vertexData[i + 3] = v;
 				}
-			} else if (renderingMode == 2) {
-				// 2: 三角錐1個
+			} else if (renderingMode == 3) {
+				// 3: 三角錐1個
 				drawVertexCount = 12;
 				VertexData pyramidVertices[12] = {
 					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
@@ -1260,8 +1485,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				for (uint32_t i = 0; i < drawVertexCount; ++i) {
 					vertexData[i] = pyramidVertices[i];
 				}
-			} else if (renderingMode == 3) {
-				// 3: 三角錐2個 (個別SRT)
+			} else if (renderingMode == 4) {
+				// 4: 三角錐2個 (個別SRT)
 				drawVertexCount = 24;
 				VertexData basePyramid[12] = {
 					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
@@ -1319,8 +1544,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					v.position.z = z + p2_Translate[2];
 					vertexData[i + 12] = v;
 				}
-			} else if (renderingMode == 4) {
-				// 4: 演出モード
+			} else if (renderingMode == 5) {
+				// 5: 演出モード
 
 				// Particle用の三角形をVertexBufferへ書き込む
 				particleSystem.WriteTriangleVertices(vertexData);
@@ -1329,25 +1554,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				particleSystem.Update();
 			}
 
+#endif
+			// Production Modeだけは既存のParticleSystem用頂点バッファを使用する
+			if (renderingMode == 5) {
+				particleSystem.WriteTriangleVertices(vertexData);
+				particleSystem.Update();
+			}
+
 			///// ----- 行列の計算 ----- /////
 			// ワールド行列の更新
 			worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
-			// カメラ行列の更新
-			cameraMatrix = Matrix4x4::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-
 			// ビュー行列の更新
-			viewMatrix = Matrix4x4::Inverse(cameraMatrix);
+			const Matrix4x4& viewMatrix =
+				camera.GetViewMatrix();
 
 			// プロジェクション行列の更新
-			projectionMatrix = Matrix4x4::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+			const Matrix4x4& projectionMatrix =
+				camera.GetProjectionMatrix();
 
-			// 球の行列の更新
+			// 三角形・三角錐の頂点と専用WVPはPrimitive3D自身が更新する
+			primitive3D.Update(viewMatrix, projectionMatrix);
+
+			// Sphere専用のWVPを更新する
 			sphere.Update(
 				viewMatrix,
 				projectionMatrix
 			);
 
+			// Object3D用WVPを計算する
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
 
@@ -1356,11 +1591,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			///// ----- ImGui中身 ----- /////
 #ifdef USE_IMGUI
-			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
-			// Dear ImGui標準機能を確認したいときだけ、次の行を有効にする
-			// ImGui::ShowDemoWindow();
+	// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
+	// Dear ImGui標準機能を確認したいときだけ、次の行を有効にする
+	// ImGui::ShowDemoWindow();
 
-			// 旧Windowパネルの編集項目をPropertiesへまとめる
+	// 旧Windowパネルの編集項目をPropertiesへまとめる
 			ImGui::Begin("Properties");
 			if (selectedObject) {
 				selectedObject->DrawProperties();
@@ -1380,172 +1615,173 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- 色変えれます ---
 			if (selectedObject == SelectedObject::Pyramid) {
-			ImGui::Text("3D Object Material");
-			ImGui::ColorEdit4("Material Color", &materialData->x);
+				ImGui::Text("3D Object Material");
+				ImGui::ColorEdit4("Material Color", &materialData->x);
 
-			// 区切り線
-			ImGui::Separator();
+				// 区切り線
+				ImGui::Separator();
 
-			/// --- 画像変えれます ---
-			// テクスチャ切り替え
-			const char* textureModes[] = {
-				"0 : No Texture (White)",
-				"1 : UV Checker",
-				"2 : Genbaneko"
-			};
+				/// --- 画像変えれます ---
+				// テクスチャ切り替え
+				const char* textureModes[] = {
+					"0 : No Texture (White)",
+					"1 : UV Checker",
+					"2 : Genbaneko"
+				};
 
-			ImGui::Combo(
-				"Texture Mode",
-				&textureMode,
-				textureModes,
-				IM_ARRAYSIZE(textureModes)
-			);
+				ImGui::Combo(
+					"Texture Mode",
+					&textureMode,
+					textureModes,
+					IM_ARRAYSIZE(textureModes)
+				);
 
-			// 区切り線
-			ImGui::Separator();
+				// 区切り線
+				ImGui::Separator();
 			}
 
 			if (selectedObject == SelectedObject::Sprite) {
-			///// ----- Sprite ----- /////
 
-			/// --- Texture ---
-			// 三角形とは別にSpriteのTextureを切り替える
-			ImGui::Text("Sprite Control");
-			ImGui::Combo(
-				"Sprite Texture Mode",
-				&spriteTextureMode,
-				textureModes,
-				IM_ARRAYSIZE(textureModes)
-			);
+				///// ----- Sprite ----- /////
+				/// --- Texture ---
+				// 三角形とは別にSpriteのTextureを切り替える
+				ImGui::Text("Sprite Control");
+				ImGui::Combo(
+					"Sprite Texture Mode",
+					&spriteTextureMode,
+					textureModes,
+					IM_ARRAYSIZE(textureModes)
+				);
 
-			/// --- 色 ---
-			// Sprite専用のMaterial Colorを変更する
-			ImGui::ColorEdit4("Sprite Material Color", &sprite.GetColor().x);
+				/// --- 色 ---
+				// Sprite専用のMaterial Colorを変更する
+				ImGui::ColorEdit4("Sprite Material Color", &sprite2D.GetColor().x);
 
-			/// --- SRT ---
-			// Sprite専用のScale、Rotate、Translateを変更する
-			Transform& spriteTransform = sprite.GetTransform();
-			ImGui::DragFloat3("Sprite Scale", &spriteTransform.scale.x, 0.01f);
-			ImGui::DragFloat3("Sprite Rotate", &spriteTransform.rotate.x, 0.01f);
-			ImGui::DragFloat3("Sprite Translate", &spriteTransform.translate.x, 1.0f);
+				/// --- SRT ---
+				// Sprite専用のScale、Rotate、Translateを変更する
+				Transform& spriteTransform = sprite2D.GetTransform();
+				ImGui::DragFloat3("Sprite Scale", &spriteTransform.scale.x, 0.01f);
+				ImGui::DragFloat3("Sprite Rotate", &spriteTransform.rotate.x, 0.01f);
+				ImGui::DragFloat3("Sprite Translate", &spriteTransform.translate.x, 1.0f);
 
-			// Spriteだけを初期状態へ戻す
-			if (ImGui::Button("Reset Sprite")) {
-				sprite.Reset();
-			}
+				// Spriteだけを初期状態へ戻す
+				if (ImGui::Button("Reset Sprite")) {
+					sprite2D.Reset();
+				}
 
-			// 区切り線
-			ImGui::Separator();
+				// 区切り線
+				ImGui::Separator();
 			}
 
 			if (selectedObject == SelectedObject::SceneSettings) {
-			/// --- モード切り替えを切り替えだドン ---
-			const char* modes[] = {
-				"0: Single Triangle",
-				"1: Double Triangles",
-				"2: Single Pyramid",
-				"3: Double Pyramids (Individual SRT)",
-				"4: Production Mode"
-			};
-			ImGui::Combo("Display Mode", &displayMode, modes, IM_ARRAYSIZE(modes));
+				/// --- モード切り替えを切り替えだドン ---
+				const char* modes[] = {
+					"0: None",
+					"1: Single Triangle",
+					"2: Double Triangles",
+					"3: Single Pyramid",
+					"4: Double Pyramids",
+					"5: Production Mode"
+				};
+				ImGui::Combo("Display Mode", &displayMode, modes, IM_ARRAYSIZE(modes));
 
-			// モード1(三角形2枚)の個別SRTスライダー
-			if (displayMode == 1) {
-				ImGui::Text("[Triangle 1]");
-				ImGui::SliderFloat3("T1 Scale", t1_Scale, 0.1f, 5.0f);
-				ImGui::SliderFloat3("T1 Rotation", t1_Rotate, -3.1415f, 3.1415f);
-				ImGui::SliderFloat3("T1 Position", t1_Translate, -3.0f, 3.0f);
+				// モード1(三角形2枚)の個別SRTスライダー
+				if (displayMode == 1) {
+					ImGui::Text("[Triangle 1]");
+					ImGui::SliderFloat3("T1 Scale", t1_Scale, 0.1f, 5.0f);
+					ImGui::SliderFloat3("T1 Rotation", t1_Rotate, -3.1415f, 3.1415f);
+					ImGui::SliderFloat3("T1 Position", t1_Translate, -3.0f, 3.0f);
 
+					ImGui::Separator();
+
+					ImGui::Text("[Triangle 2]");
+					ImGui::SliderFloat3("T2 Scale", t2_Scale, 0.1f, 5.0f);
+					ImGui::SliderFloat3("T2 Rotation", t2_Rotate, -3.1415f, 3.1415f);
+					ImGui::SliderFloat3("T2 Position", t2_Translate, -3.0f, 3.0f);
+
+					ImGui::Separator();
+				}
+
+				// モード3(三角錐2個)の個別SRTスライダー
+				if (displayMode == 3) {
+					ImGui::Text("[Pyramid 1]");
+					ImGui::SliderFloat3("P1 Scale", p1_Scale, 0.1f, 5.0f);
+					ImGui::SliderFloat3("P1 Rotation", p1_Rotate, -3.1415f, 3.1415f);
+					ImGui::SliderFloat3("P1 Position", p1_Translate, -3.0f, 3.0f);
+
+					ImGui::Separator();
+
+					ImGui::Text("[Pyramid 2]");
+					ImGui::SliderFloat3("P2 Scale", p2_Scale, 0.1f, 5.0f);
+					ImGui::SliderFloat3("P2 Rotation", p2_Rotate, -3.1415f, 3.1415f);
+					ImGui::SliderFloat3("P2 Position", p2_Translate, -3.0f, 3.0f);
+
+					ImGui::Separator();
+				}
+
+				// 区切り線
 				ImGui::Separator();
-
-				ImGui::Text("[Triangle 2]");
-				ImGui::SliderFloat3("T2 Scale", t2_Scale, 0.1f, 5.0f);
-				ImGui::SliderFloat3("T2 Rotation", t2_Rotate, -3.1415f, 3.1415f);
-				ImGui::SliderFloat3("T2 Position", t2_Translate, -3.0f, 3.0f);
-
-				ImGui::Separator();
-			}
-
-			// モード3(三角錐2個)の個別SRTスライダー
-			if (displayMode == 3) {
-				ImGui::Text("[Pyramid 1]");
-				ImGui::SliderFloat3("P1 Scale", p1_Scale, 0.1f, 5.0f);
-				ImGui::SliderFloat3("P1 Rotation", p1_Rotate, -3.1415f, 3.1415f);
-				ImGui::SliderFloat3("P1 Position", p1_Translate, -3.0f, 3.0f);
-
-				ImGui::Separator();
-
-				ImGui::Text("[Pyramid 2]");
-				ImGui::SliderFloat3("P2 Scale", p2_Scale, 0.1f, 5.0f);
-				ImGui::SliderFloat3("P2 Rotation", p2_Rotate, -3.1415f, 3.1415f);
-				ImGui::SliderFloat3("P2 Position", p2_Translate, -3.0f, 3.0f);
-
-				ImGui::Separator();
-			}
-
-			// 区切り線
-			ImGui::Separator();
 			}
 
 			if (selectedObject == SelectedObject::Pyramid) {
-			/// --- 自動で回転かと座標変えれます ---
-			ImGui::Text("Pyramid Control");
-			// 上の選択オブジェクト用Transformと表示名が同じでもIDが重ならないようにする
-			ImGui::PushID("PyramidControl");
+				/// --- 自動で回転かと座標変えれます ---
+				ImGui::Text("Pyramid Control");
+				// 上の選択オブジェクト用Transformと表示名が同じでもIDが重ならないようにする
+				ImGui::PushID("PyramidControl");
 
-			// 1_拡縮の変更(XYZ)
-			ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
+				// 1_拡縮の変更(XYZ)
+				ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
 
-			// 2_上下左右・奥への位置移動(XYZ)
-			ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
+				// 2_上下左右・奥への位置移動(XYZ)
+				ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
 
-			// 3_自動回転の切り替えボタン
-			// ボタンを押すたびにON/OFFが切り替わり、OFFになった瞬間に回転を初期値(0)にリセット
-			if (ImGui::Button(isAutoRotate ? "Stop & Reset" : "Start Auto Rotate")) {
-				isAutoRotate = !isAutoRotate;
+				// 3_自動回転の切り替えボタン
+				// ボタンを押すたびにON/OFFが切り替わり、OFFになった瞬間に回転を初期値(0)にリセット
+				if (ImGui::Button(isAutoRotate ? "Stop & Reset" : "Start Auto Rotate")) {
+					isAutoRotate = !isAutoRotate;
+					if (!isAutoRotate) {
+						transform.rotate = {0.0f, 0.0f, 0.0f}; // 回転を初期値に戻す
+					}
+				}
+
+				// 4_フラグの状態確認(0か1かで表示)
+				ImGui::Text("Auto Rotate Flag: %d", isAutoRotate ? 1 : 0);
+
+				// 5_各軸の回転(XYZ)
+				// 自動回転がOFFのときだけ手動でいじれるようにしてONのときは現在の回転角を表示する
 				if (!isAutoRotate) {
-					transform.rotate = {0.0f, 0.0f, 0.0f}; // 回転を初期値に戻す
+					ImGui::SliderFloat3("Rotation", &transform.rotate.x, -3.1415f, 3.1415f);
+				} else {
+					ImGui::Text("Rotation (Auto): X:%.2f, Y:%.2f, Z:%.2f", transform.rotate.x, transform.rotate.y, transform.rotate.z);
 				}
-			}
 
-			// 4_フラグの状態確認(0か1かで表示)
-			ImGui::Text("Auto Rotate Flag: %d", isAutoRotate ? 1 : 0);
+				// 6_すべてのパラメータをリセット (SRTと自動回転を初期値に戻す)
+				if (ImGui::Button("Reset All")) {
+					// グローバルSRTと自動回転のリセット
+					transform.scale = {1.0f, 1.0f, 1.0f};
+					transform.rotate = {0.0f, 0.0f, 0.0f};
+					transform.translate = {0.0f, 0.0f, 0.0f};
+					isAutoRotate = false;
 
-			// 5_各軸の回転(XYZ)
-			// 自動回転がOFFのときだけ手動でいじれるようにしてONのときは現在の回転角を表示する
-			if (!isAutoRotate) {
-				ImGui::SliderFloat3("Rotation", &transform.rotate.x, -3.1415f, 3.1415f);
-			} else {
-				ImGui::Text("Rotation (Auto): X:%.2f, Y:%.2f, Z:%.2f", transform.rotate.x, transform.rotate.y, transform.rotate.z);
-			}
+					// 現在のモードを維持したまま各パラメータをリセット
+					for (int i = 0; i < 3; ++i) {
+						t1_Scale[i] = 1.0f;  t1_Rotate[i] = 0.0f;
+						t2_Scale[i] = 1.0f;  t2_Rotate[i] = 0.0f;
+						p1_Scale[i] = 1.0f;  p1_Rotate[i] = 0.0f;
+						p2_Scale[i] = 1.0f;  p2_Rotate[i] = 0.0f;
+					}
+					// モード1の初期位置
+					t1_Translate[0] = -0.2f; t1_Translate[1] = -0.2f; t1_Translate[2] = 0.0f;
+					t2_Translate[0] = 0.2f;  t2_Translate[1] = 0.2f;  t2_Translate[2] = 0.2f;
 
-			// 6_すべてのパラメータをリセット (SRTと自動回転を初期値に戻す)
-			if (ImGui::Button("Reset All")) {
-				// グローバルSRTと自動回転のリセット
-				transform.scale = {1.0f, 1.0f, 1.0f};
-				transform.rotate = {0.0f, 0.0f, 0.0f};
-				transform.translate = {0.0f, 0.0f, 0.0f};
-				isAutoRotate = false;
+					// モード3の初期位置
+					p1_Translate[0] = -0.3f; p1_Translate[1] = 0.0f;  p1_Translate[2] = 0.0f;
+					p2_Translate[0] = 0.3f;  p2_Translate[1] = 0.0f;  p2_Translate[2] = 0.0f;
 
-				// 現在のモードを維持したまま各パラメータをリセット
-				for (int i = 0; i < 3; ++i) {
-					t1_Scale[i] = 1.0f;  t1_Rotate[i] = 0.0f;
-					t2_Scale[i] = 1.0f;  t2_Rotate[i] = 0.0f;
-					p1_Scale[i] = 1.0f;  p1_Rotate[i] = 0.0f;
-					p2_Scale[i] = 1.0f;  p2_Rotate[i] = 0.0f;
+					// 全Particleを削除して最初の1個を生成する
+					particleSystem.Reset();
 				}
-				// モード1の初期位置
-				t1_Translate[0] = -0.2f; t1_Translate[1] = -0.2f; t1_Translate[2] = 0.0f;
-				t2_Translate[0] = 0.2f;  t2_Translate[1] = 0.2f;  t2_Translate[2] = 0.2f;
-
-				// モード3の初期位置
-				p1_Translate[0] = -0.3f; p1_Translate[1] = 0.0f;  p1_Translate[2] = 0.0f;
-				p2_Translate[0] = 0.3f;  p2_Translate[1] = 0.0f;  p2_Translate[2] = 0.0f;
-
-				// 全Particleを削除して最初の1個を生成する
-				particleSystem.Reset();
-			}
-			ImGui::PopID();
+				ImGui::PopID();
 			}
 
 			if (selectedObject == SelectedObject::ParticleSystem) {
@@ -1573,11 +1809,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif // USE_IMGUI
 
 			// ImGuiで変更されたSpriteのSRTからWVPを更新する
-			sprite.Update();
+			sprite2D.Update();
 
 			///// ----- ImGui終わり ----- /////
 #ifdef USE_IMGUI
-			// 内部コマンドを生成する
+	// 内部コマンドを生成する
 			ImGui::Render();
 #endif // USE_IMGUI
 
@@ -1647,25 +1883,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				currentTextureHandle
 			);
 
-			// 1_モード4は全三角形描画
-			if (renderingMode == 4) {
+			// モードの描画
+			if (renderingMode == 5) {
+				// Production ModeではParticleSystemを描画する
 				particleSystem.Draw(
 					commandList,
 					viewMatrix,
 					projectionMatrix
 				);
-			}
 
-			// 2_それ以外のモード
-			else {
-				*wvpData = worldViewProjectionMatrix;
-
-				commandList->DrawInstanced(
-					drawVertexCount,
-					1,
-					0,
-					0
-				);
+			} else {
+				// Noneを含む描画判定はPrimitive3D側へ集約する
+				primitive3D.Draw(commandList, currentTextureHandle);
 			}
 
 			///// ----- Sprite描画 ----- /////
@@ -1687,7 +1916,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- 描画 ---
 			// 3Dの後に描画してSpriteを最前面へ表示する
-			sprite.Draw(commandList, spriteTextureHandle);
+			sprite2D.Draw(commandList, spriteTextureHandle);
 
 			// 画面表示できるようにする
 			// 今回はRenderTargetからPresentにする
@@ -1696,7 +1925,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
-			// ゲーム描画をImGuiから読める状態へ戻し、UIはSwapChainへ描画する
+	// ゲーム描画をImGuiから読める状態へ戻し、UIはSwapChainへ描画する
 			sceneRenderTexture.TransitionToShaderResource(commandList);
 			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
 			const float editorClearColor[] = {0.08f, 0.08f, 0.08f, 1.0f};
@@ -1706,6 +1935,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				0,
 				nullptr
 			);
+			// ImGuiは固定1280x720ではなく、現在のBackBuffer全体へ描画する
+			commandList->RSSetViewports(1, &editorViewport);
+			commandList->RSSetScissorRects(1, &editorScissorRect);
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 #endif // USE_IMGUI
 			// TransitionBarrerを張る
@@ -1731,9 +1963,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	///// ----- 解放処理 ----- /////
 	/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
 	vertexBuffer.Finalize();
+	primitive3D.Finalize();
 	// 球
 	sphere.Finalize();
-	sprite.Finalize();
+	sprite2D.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();
 	materialResource->Release();
@@ -1749,7 +1982,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	rtvDescriptorHeap.Finalize();
 	srvDescriptorHeap.Finalize();
 	dsvDescriptorHeap.Finalize();
-	
+
 	/// --- 5_スワップチェーンとバックバッファリソース ///
 	swapChainResources[0]->Release();
 	swapChainResources[1]->Release();

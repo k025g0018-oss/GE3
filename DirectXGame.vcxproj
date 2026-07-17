@@ -92,6 +92,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -127,6 +128,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Object3D.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
+	<ClCompile Include="Primitive3D.cpp" />
     <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="RasterizerState.cpp" />
     <ClCompile Include="RootSignature.cpp" />
@@ -156,6 +158,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   <ItemGroup>
     <ClInclude Include="BlendState.h" />
     <ClInclude Include="BufferResource.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="CommandContext.h" />
     <ClInclude Include="DepthStencilState.h" />
@@ -176,6 +179,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Object3D.h" />
     <ClInclude Include="ParticleSystem.h" />
+	<ClInclude Include="Primitive3D.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="RasterizerState.h" />
     <ClInclude Include="RootSignature.h" />

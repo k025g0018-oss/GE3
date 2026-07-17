@@ -2,7 +2,7 @@
 
 #ifdef USE_IMGUI
 
-#include "Object3D.h"
+#include "Primitive3D.h"
 #include "ParticleSystem.h"
 #include "Sprite.h"
 
@@ -10,34 +10,41 @@
 class IEditorObject {
 public:
 	virtual ~IEditorObject() = default;
+	// Hierarchyへ表示するオブジェクト名を返す
 	virtual const char* GetName() const = 0;
+	// 選択中オブジェクトの操作項目をPropertiesへ表示する
 	virtual void DrawProperties() = 0;
 };
 
-class Object3DEditorObject final : public IEditorObject {
+// Primitive3DをHierarchyとPropertiesへ接続するラッパークラス
+class Primitive3DEditorObject final : public IEditorObject {
 public:
-	Object3DEditorObject(Object3D& object, Vector4& materialColor, int& textureMode, ParticleSystem& particleSystem);
-	const char* GetName() const override { return "Pyramid / 3D Object"; }
+	Primitive3DEditorObject(Primitive3D& object, int& textureMode, ParticleSystem& particleSystem);
+	const char* GetName() const override { return "Primitive3D"; }
 	void DrawProperties() override;
 
 private:
-	Object3D& object_;
-	Vector4& materialColor_;
+	// 描画本体は所有せず、mainで作成したPrimitive3Dを参照する
+	Primitive3D& object_;
+	// Texture選択とParticle設定も同じProperties上で操作する
 	int& textureMode_;
 	ParticleSystem& particleSystem_;
 };
 
-class SpriteEditorObject final : public IEditorObject {
+// Sprite2DをHierarchyとPropertiesへ接続するラッパークラス
+class Sprite2DEditorObject final : public IEditorObject {
 public:
-	SpriteEditorObject(Sprite& sprite, int& textureMode);
-	const char* GetName() const override { return "Sprite"; }
+	Sprite2DEditorObject(Sprite2D& sprite, int& textureMode);
+	const char* GetName() const override { return "Sprite2D"; }
 	void DrawProperties() override;
 
 private:
-	Sprite& sprite_;
+	// 描画本体は所有せず、mainで作成したSprite2Dを参照する
+	Sprite2D& sprite_;
 	int& textureMode_;
 };
 
+// ParticleSystemをHierarchyとPropertiesへ接続するラッパークラス
 class ParticleEditorObject final : public IEditorObject {
 public:
 	explicit ParticleEditorObject(ParticleSystem& particleSystem);
@@ -45,17 +52,19 @@ public:
 	void DrawProperties() override;
 
 private:
+	// Particleの生成数や速度をPropertiesから操作するため参照を保持する
 	ParticleSystem& particleSystem_;
 };
 
+// Scene全体のStart、Stop、ResetをPropertiesへ表示するラッパークラス
 class SceneSettingsEditorObject final : public IEditorObject {
 public:
-	explicit SceneSettingsEditorObject(Object3D& object);
+	explicit SceneSettingsEditorObject(Primitive3D& object);
 	const char* GetName() const override { return "Scene Settings"; }
 	void DrawProperties() override;
 
 private:
-	Object3D& object_;
+	Primitive3D& object_;
 };
 
 #endif // USE_IMGUI

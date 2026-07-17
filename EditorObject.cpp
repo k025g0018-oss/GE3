@@ -5,6 +5,7 @@
 #include "externals/imgui/imgui.h"
 
 namespace {
+// PropertiesのComboで使用するTexture一覧
 const char* kTextureModes[] = {
 	"0 : No Texture (White)",
 	"1 : UV Checker",
@@ -12,16 +13,18 @@ const char* kTextureModes[] = {
 };
 }
 
-Object3DEditorObject::Object3DEditorObject(
-	Object3D& object, Vector4& materialColor, int& textureMode, ParticleSystem& particleSystem)
-	: object_(object), materialColor_(materialColor), textureMode_(textureMode), particleSystem_(particleSystem) {}
+Primitive3DEditorObject::Primitive3DEditorObject(
+	Primitive3D& object, int& textureMode, ParticleSystem& particleSystem)
+	: object_(object), textureMode_(textureMode), particleSystem_(particleSystem) {}
 
-void Object3DEditorObject::DrawProperties() {
-	ImGui::TextUnformatted("3D Object Material");
-	ImGui::ColorEdit4("Material Color", &materialColor_.x);
+void Primitive3DEditorObject::DrawProperties() {
+	// Primitive3Dが所有するMaterialとTextureを編集する
+	ImGui::TextUnformatted("Primitive3D Material");
+	ImGui::ColorEdit4("Material Color", &object_.GetColor().x);
 	ImGui::Combo("Texture Mode", &textureMode_, kTextureModes, IM_ARRAYSIZE(kTextureModes));
 	ImGui::Separator();
 
+	// 図形全体へ適用するTransformを編集する
 	Transform& transform = object_.GetTransform();
 	ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
 	ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
@@ -46,10 +49,11 @@ void Object3DEditorObject::DrawProperties() {
 	}
 }
 
-SpriteEditorObject::SpriteEditorObject(Sprite& sprite, int& textureMode)
+Sprite2DEditorObject::Sprite2DEditorObject(Sprite2D& sprite, int& textureMode)
 	: sprite_(sprite), textureMode_(textureMode) {}
 
-void SpriteEditorObject::DrawProperties() {
+void Sprite2DEditorObject::DrawProperties() {
+	// Sprite2D専用のTexture、色、Transformを編集する
 	ImGui::TextUnformatted("Sprite Control");
 	ImGui::Combo("Sprite Texture Mode", &textureMode_, kTextureModes, IM_ARRAYSIZE(kTextureModes));
 	ImGui::ColorEdit4("Sprite Material Color", &sprite_.GetColor().x);
@@ -66,6 +70,7 @@ ParticleEditorObject::ParticleEditorObject(ParticleSystem& particleSystem)
 	: particleSystem_(particleSystem) {}
 
 void ParticleEditorObject::DrawProperties() {
+	// ParticleSystemの現在の状態を表示し、必要な場合は初期化する
 	ImGui::TextUnformatted("ParticleSystem");
 	ImGui::Separator();
 	ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem_.GetParticleCount()));
@@ -77,17 +82,23 @@ void ParticleEditorObject::DrawProperties() {
 	ImGui::TextDisabled("Detailed execution is shown in Flow Graph.");
 }
 
-SceneSettingsEditorObject::SceneSettingsEditorObject(Object3D& object) : object_(object) {}
+SceneSettingsEditorObject::SceneSettingsEditorObject(Primitive3D& object) : object_(object) {}
 
 void SceneSettingsEditorObject::DrawProperties() {
+	// Primitive3DとParticleSystemを切り替える表示モード一覧
 	const char* modes[] = {
-		"0: Single Triangle", "1: Double Triangles", "2: Single Pyramid",
-		"3: Double Pyramids (Individual SRT)", "4: Production Mode"
+		"0: None",
+		"1: Single Triangle",
+		"2: Double Triangles",
+		"3: Single Pyramid",
+		"4: Double Pyramids",
+		"5: Production Mode"
 	};
 	int& displayMode = object_.GetDisplayMode();
 	ImGui::Combo("Display Mode", &displayMode, modes, IM_ARRAYSIZE(modes));
 
-	if (displayMode == 1) {
+	// 三角形2枚モードでは、各三角形のTransformを個別に表示する
+	if (displayMode == 2) {
 		ImGui::TextUnformatted("[Triangle 1]");
 		ImGui::SliderFloat3("T1 Scale", object_.GetTriangle1Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("T1 Rotation", object_.GetTriangle1Rotate(), -3.1415f, 3.1415f);
@@ -98,7 +109,8 @@ void SceneSettingsEditorObject::DrawProperties() {
 		ImGui::SliderFloat3("T2 Rotation", object_.GetTriangle2Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("T2 Position", object_.GetTriangle2Translate(), -3.0f, 3.0f);
 	}
-	if (displayMode == 3) {
+	// 三角錐2個モードでは、各三角錐のTransformを個別に表示する
+	if (displayMode == 4) {
 		ImGui::TextUnformatted("[Pyramid 1]");
 		ImGui::SliderFloat3("P1 Scale", object_.GetPyramid1Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("P1 Rotation", object_.GetPyramid1Rotate(), -3.1415f, 3.1415f);

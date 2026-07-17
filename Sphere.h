@@ -4,8 +4,6 @@
 
 #include <d3d12.h>
 #include <cstdint>
-#include <random>
-#include <vector>
 
 class Sphere {
 public:
