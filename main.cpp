@@ -986,6 +986,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 三角形とは別にSpriteのTextureを選択する
 	int spriteTextureMode = 1;
+	// Spriteの描画を個別に切り替える
+	bool isSpriteVisible = true;
 
 	/// Material用のリソースを作る
 	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Vector4));
@@ -1174,6 +1176,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// Sphereのテクスチャ切り替え用の選択番号
 	int sphereTextureMode = 3;
+	// Sphereの描画を個別に切り替える
+	bool isSphereVisible = true;
 
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
@@ -1240,11 +1244,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
 	Primitive3DEditorObject primitive3DEditor(primitive3D, textureMode, particleSystem);
-	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode);
+	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode, isSpriteVisible);
 	ParticleEditorObject particleEditor(particleSystem);
 	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
 	// SphereとSphere専用Texture番号をEditorへ接続する
-	SphereEditorObject sphereEditor(sphere, sphereTextureMode);
+	SphereEditorObject sphereEditor(sphere, sphereTextureMode, isSphereVisible);
 	std::vector<IEditorObject*> editorObjects = {
 		// Primitive3Dの直後に、関連するSceneのモード設定を並べる
 		&primitive3DEditor,
@@ -1912,26 +1916,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			///// ----- Sprite描画 ----- /////
 
 			/// --- Sphere描画 ---
-			// 対応するテクスチャに切り替える
-			const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
-				textureManager.GetSrvHandle(
-					static_cast<uint32_t>(sphereTextureMode)
-				);
-
-			// 行列やResource設定はSphere内で管理する
-			sphere.Draw(
-				commandList,
-				sphereTextureHandle
-			);
+			if (isSphereVisible) {
+				// 表示中だけ選択されたTextureでSphereを描画する
+				const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(sphereTextureMode)
+					);
+				sphere.Draw(commandList, sphereTextureHandle);
+			}
 
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
-			const D3D12_GPU_DESCRIPTOR_HANDLE spriteTextureHandle =
-				textureManager.GetSrvHandle(static_cast<uint32_t>(spriteTextureMode));
-
-			/// --- 描画 ---
-			// 3Dの後に描画してSpriteを最前面へ表示する
-			sprite2D.Draw(commandList, spriteTextureHandle);
+			if (isSpriteVisible) {
+				// 表示中だけ選択されたTextureでSpriteを描画する
+				const D3D12_GPU_DESCRIPTOR_HANDLE spriteTextureHandle =
+					textureManager.GetSrvHandle(static_cast<uint32_t>(spriteTextureMode));
+				// 3Dの後に描画してSpriteを最前面へ表示する
+				sprite2D.Draw(commandList, spriteTextureHandle);
+			}
 
 			// 画面表示できるようにする
 			// 今回はRenderTargetからPresentにする

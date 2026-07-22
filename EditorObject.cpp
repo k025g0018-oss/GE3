@@ -50,12 +50,14 @@ void Primitive3DEditorObject::DrawProperties() {
 	}
 }
 
-Sprite2DEditorObject::Sprite2DEditorObject(Sprite2D& sprite, int& textureMode)
-	: sprite_(sprite), textureMode_(textureMode) {}
+Sprite2DEditorObject::Sprite2DEditorObject(Sprite2D& sprite, int& textureMode, bool& isVisible)
+	: sprite_(sprite), textureMode_(textureMode), isVisible_(isVisible) {}
 
 void Sprite2DEditorObject::DrawProperties() {
 	// Sprite2D専用のTexture、色、Transformを編集する
 	ImGui::TextUnformatted("Sprite Control");
+	// Spriteの描画だけを個別にON/OFFする
+	ImGui::Checkbox("Draw Sprite", &isVisible_);
 	ImGui::Combo("Sprite Texture Mode", &textureMode_, kTextureModes, IM_ARRAYSIZE(kTextureModes));
 	ImGui::ColorEdit4("Sprite Material Color", &sprite_.GetColor().x);
 	Transform& transform = sprite_.GetTransform();
@@ -127,13 +129,17 @@ void SceneSettingsEditorObject::DrawProperties() {
 ///// ----- Sphere ----- /////
 SphereEditorObject::SphereEditorObject(
 	Sphere& sphere,
-	int& textureMode)
+	int& textureMode,
+	bool& isVisible)
 	: sphere_(sphere),
-	textureMode_(textureMode) {
+	textureMode_(textureMode),
+	isVisible_(isVisible) {
 }
 
 void SphereEditorObject::DrawProperties() {
 	ImGui::TextUnformatted("Sphere Control");
+	// Sphereの描画だけを個別にON/OFFする
+	ImGui::Checkbox("Draw Sphere", &isVisible_);
 
 	// Sphere専用のTexture番号をImGuiから変更する
 	ImGui::Combo(

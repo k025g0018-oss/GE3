@@ -35,7 +35,7 @@ private:
 // Sprite2DをHierarchyとPropertiesへ接続するラッパークラス
 class Sprite2DEditorObject final : public IEditorObject {
 public:
-	Sprite2DEditorObject(Sprite2D& sprite, int& textureMode);
+	Sprite2DEditorObject(Sprite2D& sprite, int& textureMode, bool& isVisible);
 	const char* GetName() const override { return "Sprite2D"; }
 	void DrawProperties() override;
 
@@ -43,6 +43,8 @@ private:
 	// 描画本体は所有せず、mainで作成したSprite2Dを参照する
 	Sprite2D& sprite_;
 	int& textureMode_;
+	// Spriteを描画するかどうかをmainと共有する
+	bool& isVisible_;
 };
 
 // ParticleSystemをHierarchyとPropertiesへ接続するラッパークラス
@@ -61,7 +63,7 @@ private:
 class SphereEditorObject final : public IEditorObject {
 public:
 	// Sphere本体とTexture選択番号を参照として受け取る
-	SphereEditorObject(Sphere& sphere, int& textureMode);
+	SphereEditorObject(Sphere& sphere, int& textureMode, bool& isVisible);
 
 	const char* GetName() const override {
 		return "Sphere";
@@ -75,6 +77,9 @@ private:
 
 	// Sphere専用のTexture選択番号を保持する
 	int& textureMode_;
+
+	// Sphereを描画するかどうかをmainと共有する
+	bool& isVisible_;
 };
 
 // Scene全体のStart、Stop、ResetをPropertiesへ表示するラッパークラス

@@ -6,11 +6,18 @@
 #include <cmath>
 
 namespace {
-// 三角形1枚の基準頂点。2枚表示でもこの形を複製して使用する
+// 1枚目の三角形。正面を向いた平面として使用する
 constexpr VertexData kTriangleVertices[3] = {
 	{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
 	{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
 	{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+};
+
+// 2枚目の三角形。頂点ごとのZ位置を変えてDepthを確認できる形にする
+constexpr VertexData kDepthTriangleVertices[3] = {
+	{{-0.5f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}},
+	{{0.0f, 0.0f, 0.0f, 1.0f}, {0.5f, 0.0f}},
+	{{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
 };
 
 // 三角錐1個の基準頂点。側面3枚と底面1枚を合計12頂点で作る
@@ -110,12 +117,12 @@ void Primitive3D::GenerateVertices() {
 	if (displayMode_ == 1) {
 		drawVertexCount_ = 3;
 		for (uint32_t i = 0; i < 3; ++i) { data[i] = kTriangleVertices[i]; }
-	// モード2：三角形を2枚作り、それぞれへ個別Transformを適用する
+	// モード2：形と奥行きが異なる三角形へ、それぞれ個別Transformを適用する
 	} else if (displayMode_ == 2) {
 		drawVertexCount_ = 6;
 		for (uint32_t i = 0; i < 3; ++i) {
 			data[i] = ApplyLocalTransform(kTriangleVertices[i], triangle1Scale_, triangle1Rotate_, triangle1Translate_);
-			data[i + 3] = ApplyLocalTransform(kTriangleVertices[i], triangle2Scale_, triangle2Rotate_, triangle2Translate_);
+			data[i + 3] = ApplyLocalTransform(kDepthTriangleVertices[i], triangle2Scale_, triangle2Rotate_, triangle2Translate_);
 		}
 	// モード3：三角錐を1個、そのままVertexBufferへ書き込む
 	} else if (displayMode_ == 3) {
@@ -142,13 +149,6 @@ void Primitive3D::Reset() {
 		triangle1Rotate_[i] = triangle2Rotate_[i] = pyramid1Rotate_[i] = pyramid2Rotate_[i] = 0.0f;
 		triangle1Translate_[i] = triangle2Translate_[i] = pyramid1Translate_[i] = pyramid2Translate_[i] = 0.0f;
 	}
-	// 以前のモード2と同じ配置へ戻し、2枚の三角形が完全に重ならないようにする
-	triangle1Translate_[0] = -0.2f;
-	triangle1Translate_[1] = -0.2f;
-	triangle1Translate_[2] = 0.0f;
-	triangle2Translate_[0] = 0.2f;
-	triangle2Translate_[1] = 0.2f;
-	triangle2Translate_[2] = 0.2f;
 	// 三角錐2個が重ならないよう、初期X座標だけ左右へ分ける
 	pyramid1Translate_[0] = -0.3f;
 	pyramid2Translate_[0] = 0.3f;
