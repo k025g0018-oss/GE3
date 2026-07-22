@@ -142,6 +142,13 @@ void Primitive3D::Reset() {
 		triangle1Rotate_[i] = triangle2Rotate_[i] = pyramid1Rotate_[i] = pyramid2Rotate_[i] = 0.0f;
 		triangle1Translate_[i] = triangle2Translate_[i] = pyramid1Translate_[i] = pyramid2Translate_[i] = 0.0f;
 	}
+	// 以前のモード2と同じ配置へ戻し、2枚の三角形が完全に重ならないようにする
+	triangle1Translate_[0] = -0.2f;
+	triangle1Translate_[1] = -0.2f;
+	triangle1Translate_[2] = 0.0f;
+	triangle2Translate_[0] = 0.2f;
+	triangle2Translate_[1] = 0.2f;
+	triangle2Translate_[2] = 0.2f;
 	// 三角錐2個が重ならないよう、初期X座標だけ左右へ分ける
 	pyramid1Translate_[0] = -0.3f;
 	pyramid2Translate_[0] = 0.3f;

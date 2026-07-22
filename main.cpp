@@ -1246,7 +1246,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SphereとSphere専用Texture番号をEditorへ接続する
 	SphereEditorObject sphereEditor(sphere, sphereTextureMode);
 	std::vector<IEditorObject*> editorObjects = {
-		&primitive3DEditor, &sphereEditor, &sprite2DEditor, &particleEditor, &sceneSettingsEditor
+		// Primitive3Dの直後に、関連するSceneのモード設定を並べる
+		&primitive3DEditor,
+		&sceneSettingsEditor,
+		&particleEditor,
+		// 独立した描画オブジェクトはHierarchyの後ろへ並べる
+		&sphereEditor,
+		&sprite2DEditor
 	};
 	IEditorObject* selectedObject = nullptr;
 #endif // USE_IMGUI
