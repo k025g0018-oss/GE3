@@ -13,7 +13,8 @@
 
 class TextureManager {
 public:
-	static constexpr uint32_t kTextureCount = 3;
+	// 使用するテクスチャの数
+	static constexpr uint32_t kTextureCount = 4;
 
 	TextureManager() = default;
 	~TextureManager();

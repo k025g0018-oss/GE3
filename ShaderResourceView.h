@@ -24,8 +24,11 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(uint32_t srvIndex) const;
 
 private:
-	D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU_{};
-	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
-	UINT descriptorSize_ = 0;
+	// DescriptorHandleの計算をDescriptorHeapへ任せるため参照を保存する
+	const DescriptorHeap* descriptorHeap_ = nullptr;
+
+	// ImGuiが0番を使うため、Texture用のSRVの開始位置を保存する
+	uint32_t firstDescriptorIndex_ = 0;
+
 	std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> textureSrvHandlesGPU_;
 };

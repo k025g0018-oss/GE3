@@ -5,6 +5,7 @@
 #include "Primitive3D.h"
 #include "ParticleSystem.h"
 #include "Sprite.h"
+#include "Sphere.h"
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -54,6 +55,26 @@ public:
 private:
 	// Particleの生成数や速度をPropertiesから操作するため参照を保持する
 	ParticleSystem& particleSystem_;
+};
+
+// SphereをHierarchyとPropertiesへ接続するラッパークラス
+class SphereEditorObject final : public IEditorObject {
+public:
+	// Sphere本体とTexture選択番号を参照として受け取る
+	SphereEditorObject(Sphere& sphere, int& textureMode);
+
+	const char* GetName() const override {
+		return "Sphere";
+	}
+
+	void DrawProperties() override;
+
+private:
+	// Sphereの設定を編集するため参照を保持する
+	Sphere& sphere_;
+
+	// Sphere専用のTexture選択番号を保持する
+	int& textureMode_;
 };
 
 // Scene全体のStart、Stop、ResetをPropertiesへ表示するラッパークラス

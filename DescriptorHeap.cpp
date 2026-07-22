@@ -36,18 +36,28 @@ D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GetGPUHandleStart() const {
 }
 
 // 指定した番号のCPUディスクリプタハンドルを取得する
-D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::GetCPUHandle(UINT descriptorIndex) const {
-	assert(descriptorIndex < descriptorCount_);
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::GetCPUHandle(uint32_t index) const {
+	assert(index < descriptorCount_);
+
+	// Heapの先頭から、指定したインデックスまで移動する
 	D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCPUHandleStart();
-	handle.ptr += static_cast<SIZE_T>(descriptorSize_) * descriptorIndex;
+	// CPU HandleのptrはSIZE_Tなので、計算結果もSIZE_Tへ合わせる
+	// handle.ptr += descriptorSize_ * index;
+	handle.ptr += static_cast<SIZE_T>(descriptorSize_) * index;
+
 	return handle;
 }
 
 // 指定した番号のGPUディスクリプタハンドルを取得する
-D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GetGPUHandle(UINT descriptorIndex) const {
-	assert(descriptorIndex < descriptorCount_);
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GetGPUHandle(uint32_t index) const {
+	assert(index < descriptorCount_);
+
+	// Heapの先頭から、指定したインデックスまで移動する
 	D3D12_GPU_DESCRIPTOR_HANDLE handle = GetGPUHandleStart();
-	handle.ptr += static_cast<UINT64>(descriptorSize_) * descriptorIndex;
+	// GPU HandleのptrはUINT64なので、計算結果もUINT64へ合わせる
+	// handle.ptr += descriptorSize_ * index;
+	handle.ptr += static_cast<UINT64>(descriptorSize_) * index;
+
 	return handle;
 }
 

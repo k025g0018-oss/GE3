@@ -7,24 +7,19 @@
 /// --- 初期化 ---
 // SRVを配置するDescriptorHeapの位置を設定
 void ShaderResourceView::Initialize(const DescriptorHeap& descriptorHeap, uint32_t firstDescriptorIndex, uint32_t srvCount) {
-	// SRV1個分のサイズを取得する
-	descriptorSize_ = descriptorHeap.GetDescriptorSize();
+	// Texture用SRVがHeapの範囲内に収まることを確認する
+	assert(firstDescriptorIndex + srvCount <= descriptorHeap.GetDescriptorCount());
 
-	// SRVヒープの先頭を取得する
-	srvHandleCPU_ = descriptorHeap.GetCPUHandleStart();
-	srvHandleGPU_ = descriptorHeap.GetGPUHandleStart();
+	descriptorHeap_ = &descriptorHeap;
+	firstDescriptorIndex_ = firstDescriptorIndex;
 
-	// ImGuiが0番を使うため、テクスチャは1番から使用する
-	srvHandleCPU_.ptr += static_cast<SIZE_T>(descriptorSize_) * firstDescriptorIndex;
-	srvHandleGPU_.ptr += static_cast<UINT64>(descriptorSize_) * firstDescriptorIndex;
-
-	// 描画時に使用するGPUハンドルを保存する領域を作る
 	textureSrvHandlesGPU_.resize(srvCount);
 }
 
 /// --- Texture用SRV ---
 // TextureをShaderから参照するためのSRVを作成
 void ShaderResourceView::CreateTextureSRV(ID3D12Device* device, uint32_t srvIndex, ID3D12Resource* textureResource, const DirectX::TexMetadata& metadata) {
+
 	assert(srvIndex < textureSrvHandlesGPU_.size());
 
 	// metadataをもとにSRVの設定を行う
@@ -34,17 +29,26 @@ void ShaderResourceView::CreateTextureSRV(ID3D12Device* device, uint32_t srvInde
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = static_cast<UINT>(metadata.mipLevels);
 
-	// 使用するSRVの位置を計算する
-	D3D12_CPU_DESCRIPTOR_HANDLE currentSrvHandleCPU = srvHandleCPU_;
-	D3D12_GPU_DESCRIPTOR_HANDLE currentSrvHandleGPU = srvHandleGPU_;
-	currentSrvHandleCPU.ptr += static_cast<SIZE_T>(descriptorSize_) * srvIndex;
-	currentSrvHandleGPU.ptr += static_cast<UINT64>(descriptorSize_) * srvIndex;
+	// Texture番号をDescriptorHeap全体の番号へ変換する
+	const uint32_t descriptorIndex =
+		firstDescriptorIndex_ + srvIndex;
 
-	// SRVを生成する
-	device->CreateShaderResourceView(textureResource, &srvDesc, currentSrvHandleCPU);
+	// Handleの位置計算はDescriptorHeapクラスへ任せる
+	const D3D12_CPU_DESCRIPTOR_HANDLE handleCPU =
+		descriptorHeap_->GetCPUHandle(descriptorIndex);
 
-	// 描画時に使えるように保存する
-	textureSrvHandlesGPU_[srvIndex] = currentSrvHandleGPU;
+	const D3D12_GPU_DESCRIPTOR_HANDLE handleGPU =
+		descriptorHeap_->GetGPUHandle(descriptorIndex);
+
+	// 計算したDescriptor位置へSRVを作成する
+	device->CreateShaderResourceView(
+		textureResource,
+		&srvDesc,
+		handleCPU
+	);
+
+	// 描画時に使うGPU HandleをTexture番号ごとに保存する
+	textureSrvHandlesGPU_[srvIndex] = handleGPU;
 }
 
 /// --- 取得 ---

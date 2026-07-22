@@ -9,7 +9,8 @@ namespace {
 const char* kTextureModes[] = {
 	"0 : No Texture (White)",
 	"1 : UV Checker",
-	"2 : Genbaneko"
+	"2 : Genbaneko",
+	"3 : Monster Ball"
 };
 }
 
@@ -121,6 +122,49 @@ void SceneSettingsEditorObject::DrawProperties() {
 		ImGui::SliderFloat3("P2 Rotation", object_.GetPyramid2Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("P2 Position", object_.GetPyramid2Translate(), -3.0f, 3.0f);
 	}
+}
+
+///// ----- Sphere ----- /////
+SphereEditorObject::SphereEditorObject(
+	Sphere& sphere,
+	int& textureMode)
+	: sphere_(sphere),
+	textureMode_(textureMode) {
+}
+
+void SphereEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Sphere Control");
+
+	// Sphere専用のTexture番号をImGuiから変更する
+	ImGui::Combo(
+		"Sphere Texture Mode",
+		&textureMode_,
+		kTextureModes,
+		IM_ARRAYSIZE(kTextureModes)
+	);
+
+	ImGui::Separator();
+
+	// SphereのTransformも同じPropertiesから編集する
+	Transform& transform = sphere_.GetTransform();
+
+	ImGui::DragFloat3(
+		"Sphere Scale",
+		&transform.scale.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Sphere Rotate",
+		&transform.rotate.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Sphere Translate",
+		&transform.translate.x,
+		0.01f
+	);
 }
 
 #endif // USE_IMGUI

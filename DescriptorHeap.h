@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d12.h>
+#include <cstdint>
 
 ///// ----- DescriptorHeap ----- /////
 
@@ -26,11 +27,11 @@ public:
 	// GPU側の先頭ハンドルを取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandleStart() const;
 
-	// 指定した番号のCPUディスクリプタハンドルを取得する
-	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(UINT descriptorIndex) const;
+	// 指定したインデックスのCPUディスクリプタハンドルを取得する
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(uint32_t index) const;
 
-	// 指定した番号のGPUディスクリプタハンドルを取得する
-	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(UINT descriptorIndex) const;
+	// 指定したインデックスのGPUディスクリプタハンドルを取得する
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(uint32_t index) const;
 
 	// Descriptor1個分のサイズを取得
 	UINT GetDescriptorSize() const { return descriptorSize_; }

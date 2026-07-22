@@ -17,11 +17,12 @@ TextureManager::~TextureManager() {
 /// --- 初期化 ---
 // Textureを読み込み、GPUへの転送とSRVの作成を行う
 void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const DescriptorHeap& srvDescriptorHeap) {
-	// テクスチャのファイルパス
+	// テクスチャのファイルパス 番号1~ 0はImGuiが使う
 	const char* textureFilePaths[kTextureCount] = {
 		"resources/white.png",
 		"resources/uvChecker.png",
-		"resources/genbaneko.png"
+		"resources/genbaneko.png",
+		"resources/monsterBall.png"
 	};
 
 	// ImGuiが0番を使うため、Texture用SRVは1番から使用する

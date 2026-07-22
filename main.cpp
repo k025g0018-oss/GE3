@@ -203,7 +203,7 @@ const char* GetSelectedObjectName(SelectedObject selectedObject) {
 // Scene用レンダーテクスチャをパネル内へ表示する カメラ操作
 bool DrawScene(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle,
-	const IEditorObject * selectedObject
+	const IEditorObject* selectedObject
 ) {
 	ImGui::Begin("Scene");
 
@@ -245,9 +245,9 @@ bool DrawScene(
 
 // Particle Flow内の1ノードを描画する
 void DrawParticleFlowNode(
-	ImDrawList * drawList,
-	const ImVec2 & position,
-	const ImVec2 & size,
+	ImDrawList* drawList,
+	const ImVec2& position,
+	const ImVec2& size,
 	const char* label,
 	bool active,
 	bool eventActive = false
@@ -270,7 +270,7 @@ void DrawParticleFlowNode(
 }
 
 // ノード間の処理順を矢印で描画する
-void DrawParticleFlowArrow(ImDrawList * drawList, const ImVec2 & from, const ImVec2 & to, bool active) {
+void DrawParticleFlowArrow(ImDrawList* drawList, const ImVec2& from, const ImVec2& to, bool active) {
 	const ImU32 color = active ? IM_COL32(95, 225, 140, 255) : IM_COL32(115, 120, 130, 255);
 	drawList->AddLine(from, to, color, active ? 3.0f : 2.0f);
 	const float direction = to.x >= from.x ? 1.0f : -1.0f;
@@ -283,7 +283,7 @@ void DrawParticleFlowArrow(ImDrawList * drawList, const ImVec2 & from, const ImV
 }
 
 // ParticleSystemの実行順と直近イベントを読み取り専用で可視化する
-void DrawParticleFlow(const ParticleSystem & particleSystem) {
+void DrawParticleFlow(const ParticleSystem& particleSystem) {
 	ImGui::Begin("Particle Flow");
 	const ParticleSystem::DebugFlowState& state = particleSystem.GetDebugFlowState();
 
@@ -332,7 +332,7 @@ void DrawParticleFlow(const ParticleSystem & particleSystem) {
 }
 
 // ノードをInvisibleButtonとして登録し、ドラッグ操作で位置を更新する
-void DrawDraggableNode(const char* id, const char* label, ImVec2 & position, bool active) {
+void DrawDraggableNode(const char* id, const char* label, ImVec2& position, bool active) {
 	const ImVec2 nodeSize(135.0f, 46.0f);
 	ImGui::SetCursorScreenPos(position);
 	ImGui::PushID(id);
@@ -350,7 +350,7 @@ void DrawDraggableNode(const char* id, const char* label, ImVec2 & position, boo
 	ImGui::PopID();
 }
 
-void DrawFlowConnection(const ImVec2 & fromNode, const ImVec2 & toNode, bool active) {
+void DrawFlowConnection(const ImVec2& fromNode, const ImVec2& toNode, bool active) {
 	const ImVec2 nodeSize(135.0f, 46.0f);
 	DrawParticleFlowArrow(
 		ImGui::GetWindowDrawList(),
@@ -358,7 +358,7 @@ void DrawFlowConnection(const ImVec2 & fromNode, const ImVec2 & toNode, bool act
 		ImVec2(toNode.x, toNode.y + nodeSize.y * 0.5f), active);
 }
 
-void DrawFlowGraph(const ParticleSystem & particleSystem, const Primitive3D & primitive3D) {
+void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& primitive3D) {
 	ImGui::Begin("Flow Graph");
 	ImGui::TextDisabled("Drag nodes with the left mouse button. Connections visualize processing order.");
 	if (ImGui::BeginTabBar("FlowTabs")) {
@@ -431,8 +431,8 @@ void DrawFlowGraph(const ParticleSystem & particleSystem, const Primitive3D & pr
 
 // 描画統計を表示する
 void DrawStatistics(
-	const ParticleSystem & particleSystem,
-	Camera & camera
+	const ParticleSystem& particleSystem,
+	Camera& camera
 ) {
 	ImGui::Begin("Statistics");
 
@@ -493,7 +493,7 @@ void DrawStatistics(
 }
 
 // 指定されたフォルダの中身だけを再帰的に表示する
-void DrawDirectoryTree(const std::filesystem::path & directory) {
+void DrawDirectoryTree(const std::filesystem::path& directory) {
 	std::error_code error;
 
 	for (const auto& entry :
@@ -536,9 +536,9 @@ void DrawContentBrowser() {
 
 // TextureManagerへ読み込み済みのPNGなら、対応するSRVを返す
 bool TryGetLoadedTexture(
-	const std::filesystem::path & path,
-	const TextureManager & textureManager,
-	D3D12_GPU_DESCRIPTOR_HANDLE & srvHandle
+	const std::filesystem::path& path,
+	const TextureManager& textureManager,
+	D3D12_GPU_DESCRIPTOR_HANDLE& srvHandle
 ) {
 	const std::string fileName = path.filename().string();
 	if (fileName == "white.png") {
@@ -557,7 +557,7 @@ bool TryGetLoadedTexture(
 }
 
 // 拡張子に合わせた紙アイコンをDear ImGuiの図形で描く
-void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2 & size) {
+void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2& size) {
 	ImGui::InvisibleButton(id, size);
 	ImDrawList* drawList = ImGui::GetWindowDrawList();
 	const ImVec2 min = ImGui::GetItemRectMin();
@@ -582,9 +582,9 @@ void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec
 
 // フォルダまたはファイルの種類に合ったアイコンを表示する
 bool DrawContentBrowserIcon(
-	const std::filesystem::directory_entry & entry,
-	const TextureManager & textureManager,
-	const ImVec2 & iconSize
+	const std::filesystem::directory_entry& entry,
+	const TextureManager& textureManager,
+	const ImVec2& iconSize
 ) {
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
 	if (!entry.is_directory() && TryGetLoadedTexture(entry.path(), textureManager, textureHandle)) {
@@ -610,7 +610,7 @@ bool DrawContentBrowserIcon(
 }
 
 // ソリューション内のフォルダとファイルを、アイコン付きで表示する
-void DrawContentBrowserAssets(const TextureManager & textureManager) {
+void DrawContentBrowserAssets(const TextureManager& textureManager) {
 	ImGui::Begin("Content Browser");
 
 	static std::filesystem::path currentDirectory = ".";
@@ -1051,8 +1051,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}}, // 奥
 	};
 
-
-
 	// データをGPUリソースへ書き込む(for文でコピー)
 	for (uint32_t i = 0; i < 12; ++i) {
 		vertexData[i] = pyramidVertices[i];
@@ -1168,16 +1166,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			transform.translate
 		);
 
-	/// --- 球 ---
+	/// --- 球 (Sphere) ---
 	Sphere sphere;
 
 	// ImGuiでは1～32分割まで変更できるようにする
 	sphere.Initialize(device, 32);
 
+	// Sphereのテクスチャ切り替え用の選択番号
+	int sphereTextureMode = 3;
+
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
-	// 1～3番はゲーム用Texture、4番はScene表示用として固定する
-	constexpr uint32_t kSceneSrvDescriptorIndex = 4;
+	// Texture用SRVは1番から始まるため、その直後をScene用にする
+	constexpr uint32_t kTextureSrvStartIndex = 1;
+	constexpr uint32_t kSceneSrvDescriptorIndex =
+		kTextureSrvStartIndex + TextureManager::kTextureCount;
+
 	SceneRenderTexture sceneRenderTexture;
 	sceneRenderTexture.Initialize(
 		device,
@@ -1239,8 +1243,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode);
 	ParticleEditorObject particleEditor(particleSystem);
 	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
+	// SphereとSphere専用Texture番号をEditorへ接続する
+	SphereEditorObject sphereEditor(sphere, sphereTextureMode);
 	std::vector<IEditorObject*> editorObjects = {
-		&primitive3DEditor, &sprite2DEditor, &particleEditor, &sceneSettingsEditor
+		&primitive3DEditor, &sphereEditor, &sprite2DEditor, &particleEditor, &sceneSettingsEditor
 	};
 	IEditorObject* selectedObject = nullptr;
 #endif // USE_IMGUI
@@ -1900,8 +1906,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			///// ----- Sprite描画 ----- /////
 
 			/// --- Sphere描画 ---
+			// 対応するテクスチャに切り替える
 			const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
-				textureManager.GetSrvHandle(1);
+				textureManager.GetSrvHandle(
+					static_cast<uint32_t>(sphereTextureMode)
+				);
 
 			// 行列やResource設定はSphere内で管理する
 			sphere.Draw(
