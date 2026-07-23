@@ -32,12 +32,13 @@
 #include "Camera.h"
 #include "TransformationMatrix.h"
 #include "DirectionalLight.h"
+#include "Material.h"
 
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
 #include <system_error> // フォルダ列挙エラーを安全に受け取るため
-
 #include <vector> // ImGuiが使用するSRV番号を管理するため
+#include <cmath>
 
 // ImGui
 #ifdef USE_IMGUI
@@ -993,13 +994,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	bool isSpriteVisible = true;
 
 	/// --- Material用のリソースを作る ---
-	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Vector4));
+	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Material));
 	// マテリアルにデータを書き込む
-	Vector4* materialData = nullptr;
+	Material* materialData = nullptr;
 	// 書き込むためのアドレスを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	// 色書き込み
-	*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	// 基本色を白にする
+	materialData->color =
+	{1.0f, 1.0f, 1.0f, 1.0f};
+	// main側の頂点法線が未設定なので一旦無効にする
+	materialData->enableLighting = false;
 
 	/// --- 平行光源用の定数バッファを作成する ---
 	ID3D12Resource* directionalLightResource =
@@ -1284,6 +1289,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		&sprite2DEditor
 	};
 	IEditorObject* selectedObject = nullptr;
+
 #endif // USE_IMGUI
 
 	///// ----- メインループ ----- /////
@@ -1358,6 +1364,55 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// Dockノードを組み直したあとにViewportへ登録する
 			ImGui::DockSpaceOverViewport(dockspaceId, mainViewport);
+
+			ImGui::Begin("Directional Light");
+
+			// 光源色を変更する
+			ImGui::ColorEdit4(
+				"Light Color",
+				&directionalLightData->color.x
+			);
+
+			// 光の進む方向を変更する
+			const bool directionChanged = ImGui::DragFloat3(
+				"Light Direction",
+				&directionalLightData->direction.x,
+				0.01f,
+				-1.0f,
+				1.0f
+			);
+
+			// 光源の輝度を変更する
+			ImGui::DragFloat(
+				"Light Intensity",
+				&directionalLightData->intensity,
+				0.01f,
+				0.0f,
+				10.0f
+			);
+
+			// 方向が変更されたら必ず単位ベクトルへ正規化する
+			if (directionChanged) {
+				Vector3& direction = directionalLightData->direction;
+
+				const float length = std::sqrt(
+					direction.x * direction.x +
+					direction.y * direction.y +
+					direction.z * direction.z
+				);
+
+				// ゼロベクトルは正規化できないため除外する
+				if (length > 0.0001f) {
+					direction.x /= length;
+					direction.y /= length;
+					direction.z /= length;
+				} else {
+					// 不正な方向になった場合は真下へ戻す
+					direction = {0.0f, -1.0f, 0.0f};
+				}
+			}
+
+			ImGui::End();
 
 			DrawHierarchy(editorObjects, selectedObject);
 

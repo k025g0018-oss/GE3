@@ -2,6 +2,7 @@
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
 #include "TransformationMatrix.h"
+#include "Material.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -57,7 +58,8 @@ private:
 
 	// Sphere専用Material
 	ID3D12Resource* materialResource_ = nullptr;
-	Vector4* materialData_ = nullptr;
+	// Sphere専用のMaterialを書き込む
+	Material* materialData_ = nullptr;
 
 	// Sphere専用WVP
 	ID3D12Resource* wvpResource_ = nullptr;

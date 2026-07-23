@@ -31,10 +31,36 @@ struct PixelShaderOutput {
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    output.color = gMaterial.color;
     
-    float32_t4 textureColor = gTexture.Sample(gSampler, input.texcoord);
-    output.color = gMaterial.color * textureColor;
+   // テクスチャから色を取得する
+    float32_t4 textureColor =
+        gTexture.Sample(gSampler, input.texcoord);
+
+    if (gMaterial.enableLighting != 0)
+    {
+        // 補間後の法線を再度正規化する
+        float32_t3 normal = normalize(input.normal);
+
+        // 法線と光が来る方向の内積から明るさを求める
+        float lightingCos = saturate(
+            dot(normal, -gDirectionalLight.direction)
+        );
+
+        // マテリアル・テクスチャ・光源色・明るさを合成する
+        output.color =
+            gMaterial.color *
+            textureColor *
+            gDirectionalLight.color *
+            lightingCos *
+            gDirectionalLight.intensity;
+    }
+    else
+    {
+        // ライティングしない場合は従来の色計算を行う
+        output.color =
+            gMaterial.color *
+            textureColor;
+    }
     
     return output;
 }

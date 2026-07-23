@@ -3,6 +3,7 @@
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
 #include "TransformationMatrix.h"
+#include "Material.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -33,32 +34,70 @@ public:
 
 	///// ----- 共通設定 ----- /////
 	// Propertiesからオブジェクト全体のTransformを操作する
-	Transform& GetTransform() { return transform_; }
-	const Transform& GetTransform() const { return transform_; }
+	Transform& GetTransform() {
+		return transform_;
+	}
+	const Transform& GetTransform() const {
+		return transform_;
+	}
 	// PropertiesからMaterialの色を操作する
-	Vector4& GetColor() { return *materialData_; }
+	Vector4& GetColor() {
+		return materialData_->color;
+	}
 	// StartとStopから自動回転の状態を操作する
-	bool& GetIsPlaying() { return isPlaying_; }
-	bool IsPlaying() const { return isPlaying_; }
+	bool& GetIsPlaying() {
+		return isPlaying_;
+	}
+	bool IsPlaying() const {
+		return isPlaying_;
+	}
 	// 0:なし、1:三角形1枚、2:三角形2枚、3:三角錐1個、4:三角錐2個、5:ParticleSystem
-	int& GetDisplayMode() { return displayMode_; }
-	int GetDisplayMode() const { return displayMode_; }
+	int& GetDisplayMode() {
+		return displayMode_;
+	}
+	int GetDisplayMode() const {
+		return displayMode_;
+	}
 
 	///// ----- モードごとの個別Transform ----- /////
 	// 三角形を2枚表示するモードで、それぞれを個別に操作する
-	float* GetTriangle1Scale() { return triangle1Scale_; }
-	float* GetTriangle1Rotate() { return triangle1Rotate_; }
-	float* GetTriangle1Translate() { return triangle1Translate_; }
-	float* GetTriangle2Scale() { return triangle2Scale_; }
-	float* GetTriangle2Rotate() { return triangle2Rotate_; }
-	float* GetTriangle2Translate() { return triangle2Translate_; }
+	float* GetTriangle1Scale() {
+		return triangle1Scale_;
+	}
+	float* GetTriangle1Rotate() {
+		return triangle1Rotate_;
+	}
+	float* GetTriangle1Translate() {
+		return triangle1Translate_;
+	}
+	float* GetTriangle2Scale() {
+		return triangle2Scale_;
+	}
+	float* GetTriangle2Rotate() {
+		return triangle2Rotate_;
+	}
+	float* GetTriangle2Translate() {
+		return triangle2Translate_;
+	}
 	// 三角錐を2個表示するモードで、それぞれを個別に操作する
-	float* GetPyramid1Scale() { return pyramid1Scale_; }
-	float* GetPyramid1Rotate() { return pyramid1Rotate_; }
-	float* GetPyramid1Translate() { return pyramid1Translate_; }
-	float* GetPyramid2Scale() { return pyramid2Scale_; }
-	float* GetPyramid2Rotate() { return pyramid2Rotate_; }
-	float* GetPyramid2Translate() { return pyramid2Translate_; }
+	float* GetPyramid1Scale() {
+		return pyramid1Scale_;
+	}
+	float* GetPyramid1Rotate() {
+		return pyramid1Rotate_;
+	}
+	float* GetPyramid1Translate() {
+		return pyramid1Translate_;
+	}
+	float* GetPyramid2Scale() {
+		return pyramid2Scale_;
+	}
+	float* GetPyramid2Rotate() {
+		return pyramid2Rotate_;
+	}
+	float* GetPyramid2Translate() {
+		return pyramid2Translate_;
+	}
 
 private:
 	// displayMode_に合わせてVertexBufferへ書き込む頂点を作成する
@@ -72,7 +111,8 @@ private:
 	VertexBuffer vertexBuffer_;
 	// ピクセルシェーダーへ渡すMaterialの色
 	ID3D12Resource* materialResource_ = nullptr;
-	Vector4* materialData_ = nullptr;
+	// Primitive3D専用Material
+	Material* materialData_ = nullptr;
 	// 頂点シェーダーへ渡すWorld・View・Projection行列
 	ID3D12Resource* wvpResource_ = nullptr;
 	TransformationMatrix* wvpData_ = nullptr;

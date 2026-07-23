@@ -49,7 +49,7 @@ void Sphere::Initialize(
 	materialResource_ =
 		BufferResource::Create(
 			device,
-			sizeof(Vector4)
+			sizeof(Material)
 		);
 
 	HRESULT hr = materialResource_->Map(
@@ -61,12 +61,12 @@ void Sphere::Initialize(
 	assert(SUCCEEDED(hr));
 
 	// 最初はTextureの色をそのまま表示する
-	*materialData_ = {
-		1.0f,
-		1.0f,
-		1.0f,
-		1.0f
-	};
+	// Sphereの色を白に設定する
+	materialData_->color =
+	{1.0f, 1.0f, 1.0f, 1.0f};
+
+	// まずはSphereだけライティングを有効にする
+	materialData_->enableLighting = true;
 
 	// Sphere専用のWVP Resourceを作成する
 	wvpResource_ =
@@ -313,25 +313,42 @@ void Sphere::GenerateVertices() {
 			*/
 
 			// 1枚目_a-c-b
+			// 単位球では頂点座標のXYZが外向き法線になる
 			vertexData[startIndex + 0] = {
-				a, {u0, v0}
+				a,
+				{u0, v0},
+				{a.x, a.y, a.z}
 			};
+
 			vertexData[startIndex + 1] = {
-				c, {u0, v1}
+				c,
+				{u0, v1},
+				{c.x, c.y, c.z}
 			};
+
 			vertexData[startIndex + 2] = {
-				b, {u1, v0}
+				b,
+				{u1, v0},
+				{b.x, b.y, b.z}
 			};
 
 			// 2枚目_c-d-b
 			vertexData[startIndex + 3] = {
-				c, {u0, v1}
+				c,
+				{u0, v1},
+				{c.x, c.y, c.z}
 			};
+
 			vertexData[startIndex + 4] = {
-				d, {u1, v1}
+				d,
+				{u1, v1},
+				{d.x, d.y, d.z}
 			};
+
 			vertexData[startIndex + 5] = {
-				b, {u1, v0}
+				b,
+				{u1, v0},
+				{b.x, b.y, b.z}
 			};
 			
 		}

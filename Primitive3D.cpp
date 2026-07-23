@@ -41,10 +41,15 @@ void Primitive3D::Initialize(ID3D12Device* device) {
 	vertexBuffer_.Initialize(device, kMaxVertexCount);
 
 	// Material用の定数バッファを作り、初期色を白にする
-	materialResource_ = BufferResource::Create(device, sizeof(Vector4));
+	materialResource_ = BufferResource::Create(device, sizeof(Material));
 	HRESULT hr = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 	assert(SUCCEEDED(hr));
-	*materialData_ = {1.0f, 1.0f, 1.0f, 1.0f};
+	// Primitive3Dの基本色を白にする
+	materialData_->color =
+	{1.0f, 1.0f, 1.0f, 1.0f};
+
+	// 法線設定が終わるまではライティングを無効にする
+	materialData_->enableLighting = false;
 
 	// Primitive3D専用のWVP定数バッファを作る
 	wvpResource_ = BufferResource::Create(device, sizeof(TransformationMatrix));
