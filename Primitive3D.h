@@ -44,6 +44,14 @@ public:
 	Vector4& GetColor() {
 		return materialData_->color;
 	}
+	// PropertiesからPrimitive3Dのライティング状態を取得する
+	bool IsLightingEnabled() const {
+		return materialData_->enableLighting != 0;
+	}
+	// 現在選択している表示モードのライティングを切り替える
+	void SetLightingEnabled(bool enabled) {
+		materialData_->enableLighting = enabled ? 1 : 0;
+	}
 	// StartとStopから自動回転の状態を操作する
 	bool& GetIsPlaying() {
 		return isPlaying_;

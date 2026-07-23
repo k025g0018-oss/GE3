@@ -49,6 +49,16 @@ public:
 	uint32_t GetSubdivision() const;
 	uint32_t GetVertexCount() const;
 
+	// Sphereのライティング設定を取得する
+	bool IsLightingEnabled() const {
+		return materialData_->enableLighting != 0;
+	}
+
+	// Sphereのライティングを切り替える
+	void SetLightingEnabled(bool enabled) {
+		materialData_->enableLighting = enabled ? 1 : 0;
+	}
+
 private:
 	// 分割数が変更されたときに頂点を作り直す
 	void GenerateVertices();

@@ -23,6 +23,12 @@ void Primitive3DEditorObject::DrawProperties() {
 	ImGui::TextUnformatted("Primitive3D Material");
 	ImGui::ColorEdit4("Material Color", &object_.GetColor().x);
 	ImGui::Combo("Texture Mode", &textureMode_, kTextureModes, IM_ARRAYSIZE(kTextureModes));
+
+	// Primitive3Dの全表示モードでライティングを個別にON/OFFする
+	bool enableLighting = object_.IsLightingEnabled();
+	if (ImGui::Checkbox("Enable Lighting", &enableLighting)) {
+		object_.SetLightingEnabled(enableLighting);
+	}
 	ImGui::Separator();
 
 	// 図形全体へ適用するTransformを編集する
@@ -140,6 +146,18 @@ void SphereEditorObject::DrawProperties() {
 	ImGui::TextUnformatted("Sphere Control");
 	// Sphereの描画だけを個別にON/OFFする
 	ImGui::Checkbox("Draw Sphere", &isVisible_);
+
+	// Sphereのライティングを個別に切り替える
+	bool enableLighting =
+		sphere_.IsLightingEnabled();
+
+	// Checkboxが変更されたときだけMaterialへ反映する
+	if (ImGui::Checkbox(
+		"Enable Lighting",
+		&enableLighting
+		)) {
+		sphere_.SetLightingEnabled(enableLighting);
+	}
 
 	// Sphere専用のTexture番号をImGuiから変更する
 	ImGui::Combo(

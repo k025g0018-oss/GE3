@@ -6,27 +6,66 @@
 #include <cmath>
 
 namespace {
-// 1枚目の三角形。正面を向いた平面として使用する
-constexpr VertexData kTriangleVertices[3] = {
-	{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
-	{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-};
+	// 変換後の三角形3頂点から、面に垂直な単位法線を作る
+	Vector3 CalculateTriangleNormal(
+		const VertexData& vertex0,
+		const VertexData& vertex1,
+		const VertexData& vertex2
+	) {
+		// 頂点0から残りの頂点へ向かう2本の辺を作る
+		const Vector3 edge1 = {
+			vertex1.position.x - vertex0.position.x,
+			vertex1.position.y - vertex0.position.y,
+			vertex1.position.z - vertex0.position.z
+		};
+		const Vector3 edge2 = {
+			vertex2.position.x - vertex0.position.x,
+			vertex2.position.y - vertex0.position.y,
+			vertex2.position.z - vertex0.position.z
+		};
 
-// 2枚目の三角形。頂点ごとのZ位置を変えてDepthを確認できる形にする
-constexpr VertexData kDepthTriangleVertices[3] = {
-	{{-0.5f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}},
-	{{0.0f, 0.0f, 0.0f, 1.0f}, {0.5f, 0.0f}},
-	{{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-};
+		// 2本の辺の外積から面法線を求める
+		Vector3 normal = {
+			edge1.y * edge2.z - edge1.z * edge2.y,
+			edge1.z * edge2.x - edge1.x * edge2.z,
+			edge1.x * edge2.y - edge1.y * edge2.x
+		};
 
-// 三角錐1個の基準頂点。側面3枚と底面1枚を合計12頂点で作る
-constexpr VertexData kPyramidVertices[12] = {
-	{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-	{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-	{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-};
+		// Shaderへ渡す法線は単位ベクトルにそろえる
+		const float length = std::sqrt(
+			normal.x * normal.x +
+			normal.y * normal.y +
+			normal.z * normal.z
+		);
+		if (length > 0.0001f) {
+			normal.x /= length;
+			normal.y /= length;
+			normal.z /= length;
+		}
+
+		return normal;
+	}
+	// 1枚目の三角形。正面を向いた平面として使用する
+	constexpr VertexData kTriangleVertices[3] = {
+		{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
+		{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+		{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+	};
+
+	// 2枚目の三角形。頂点ごとのZ位置を変えてDepthを確認できる形にする
+	constexpr VertexData kDepthTriangleVertices[3] = {
+		{{-0.5f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}},
+		{{0.0f, 0.0f, 0.0f, 1.0f}, {0.5f, 0.0f}},
+		{{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+	};
+
+	// 三角錐1個の基準頂点。側面3枚と底面1枚を合計12頂点で作る
+	constexpr VertexData kPyramidVertices[12] = {
+		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+		{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
+		{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
+		{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
+	};
 }
 
 Primitive3D::~Primitive3D() {
@@ -48,8 +87,8 @@ void Primitive3D::Initialize(ID3D12Device* device) {
 	materialData_->color =
 	{1.0f, 1.0f, 1.0f, 1.0f};
 
-	// 法線設定が終わるまではライティングを無効にする
-	materialData_->enableLighting = false;
+	// 全表示モードで面法線を生成するため、初期状態からライティングを有効にする
+	materialData_->enableLighting = true;
 
 	// Primitive3D専用のWVP定数バッファを作る
 	wvpResource_ = BufferResource::Create(device, sizeof(TransformationMatrix));
@@ -125,25 +164,43 @@ void Primitive3D::GenerateVertices() {
 	// モード1：三角形を1枚、そのままVertexBufferへ書き込む
 	if (displayMode_ == 1) {
 		drawVertexCount_ = 3;
-		for (uint32_t i = 0; i < 3; ++i) { data[i] = kTriangleVertices[i]; }
-	// モード2：形と奥行きが異なる三角形へ、それぞれ個別Transformを適用する
+		for (uint32_t i = 0; i < 3; ++i) {
+			data[i] = kTriangleVertices[i];
+		}
+		// モード2：形と奥行きが異なる三角形へ、それぞれ個別Transformを適用する
 	} else if (displayMode_ == 2) {
 		drawVertexCount_ = 6;
 		for (uint32_t i = 0; i < 3; ++i) {
 			data[i] = ApplyLocalTransform(kTriangleVertices[i], triangle1Scale_, triangle1Rotate_, triangle1Translate_);
 			data[i + 3] = ApplyLocalTransform(kDepthTriangleVertices[i], triangle2Scale_, triangle2Rotate_, triangle2Translate_);
 		}
-	// モード3：三角錐を1個、そのままVertexBufferへ書き込む
+		// モード3：三角錐を1個、そのままVertexBufferへ書き込む
 	} else if (displayMode_ == 3) {
 		drawVertexCount_ = 12;
-		for (uint32_t i = 0; i < 12; ++i) { data[i] = kPyramidVertices[i]; }
-	// モード4：三角錐を2個作り、それぞれへ個別Transformを適用する
+		for (uint32_t i = 0; i < 12; ++i) {
+			data[i] = kPyramidVertices[i];
+		}
+		// モード4：三角錐を2個作り、それぞれへ個別Transformを適用する
 	} else if (displayMode_ == 4) {
 		drawVertexCount_ = 24;
 		for (uint32_t i = 0; i < 12; ++i) {
 			data[i] = ApplyLocalTransform(kPyramidVertices[i], pyramid1Scale_, pyramid1Rotate_, pyramid1Translate_);
 			data[i + 12] = ApplyLocalTransform(kPyramidVertices[i], pyramid2Scale_, pyramid2Rotate_, pyramid2Translate_);
 		}
+	}
+
+	// 各モードで生成した変換後の三角形ごとに面法線を設定する
+	for (uint32_t i = 0; i + 2 < drawVertexCount_; i += 3) {
+		const Vector3 normal = CalculateTriangleNormal(
+			data[i],
+			data[i + 1],
+			data[i + 2]
+		);
+
+		// 同じ面を構成する3頂点には同じ法線を渡す
+		data[i].normal = normal;
+		data[i + 1].normal = normal;
+		data[i + 2].normal = normal;
 	}
 }
 
@@ -170,10 +227,14 @@ void Primitive3D::Finalize() {
 
 	// Map先を無効にしてからMaterialリソースを解放する
 	materialData_ = nullptr;
-	if (materialResource_ != nullptr) { materialResource_->Release(); materialResource_ = nullptr; }
+	if (materialResource_ != nullptr) {
+		materialResource_->Release(); materialResource_ = nullptr;
+	}
 
 	// Map先を無効にしてからWVPリソースを解放する
 	wvpData_ = nullptr;
-	if (wvpResource_ != nullptr) { wvpResource_->Release(); wvpResource_ = nullptr; }
+	if (wvpResource_ != nullptr) {
+		wvpResource_->Release(); wvpResource_ = nullptr;
+	}
 	drawVertexCount_ = 0;
 }
