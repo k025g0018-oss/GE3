@@ -37,7 +37,7 @@ void Sprite2D::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t c
 
 	/// --- MaterialResource ---
 	// Sprite専用の色を保存するMaterialを作成
-	materialResource_ = BufferResource::Create(device, sizeof(Vector4));
+	materialResource_ = BufferResource::Create(device, sizeof(Material));
 	HRESULT hr = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 	assert(SUCCEEDED(hr));
 
@@ -47,7 +47,10 @@ void Sprite2D::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t c
 	hr = wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));
 	assert(SUCCEEDED(hr));
 
+	// Transform・色・ライティング設定を初期化する
 	Reset();
+
+	// 初期化したTransformからWVP行列を作成する
 	Update();
 }
 
@@ -109,8 +112,13 @@ void Sprite2D::Reset() {
 	transform_.rotate = {0.0f, 0.0f, 0.0f};
 	transform_.translate = {0.0f, 0.0f, 0.0f};
 
+	// Spriteの色とライティング設定を初期値へ戻す
 	if (materialData_ != nullptr) {
-		*materialData_ = {1.0f, 1.0f, 1.0f, 1.0f};
+		// Spriteの色を白へ戻す
+		materialData_->color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+		// SpriteにはLightingを適用しない
+		materialData_->enableLighting = false;
 	}
 }
 

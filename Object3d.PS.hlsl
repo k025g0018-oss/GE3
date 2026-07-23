@@ -1,10 +1,11 @@
 #define float32_t4 float4
-#define float32_t4x4 float4x4
+#define int32_t int
 
 #include "Object3d.hlsli"
 
 struct Material {
     float32_t4 color;
+    int32_t enableLighting;
 };
 
 // ここに宣言しなさい

@@ -1,5 +1,6 @@
 #define float32_t4 float4
 #define float32_t4x4 float4x4
+#define float32_t3 float3
 
 #include "Object3d.hlsli"
 
@@ -11,6 +12,7 @@ ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
 struct VertexShaderInput {
     float32_t4 position : POSITION0;
     float32_t2 texcoord : TEXCOORD0;
+    float32_t3 normal : NORMAL0;
 };
 
 VertexShaderOutput main(VertexShaderInput input)

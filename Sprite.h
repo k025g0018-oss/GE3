@@ -2,6 +2,7 @@
 
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
+#include "Material.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -30,10 +31,14 @@ public:
 
 	/// --- 取得 ---
 	// ImGuiから変更するTransformを取得
-	Transform& GetTransform() { return transform_; }
+	Transform& GetTransform() {
+		return transform_;
+	}
 
 	// ImGuiから変更する色を取得
-	Vector4& GetColor() { return *materialData_; }
+	Vector4& GetColor() {
+		return materialData_->color;
+	}
 
 	/// --- リセット ---
 	// SRTと色を初期値へ戻す
@@ -48,7 +53,7 @@ private:
 
 	VertexBuffer vertexBuffer_;
 	ID3D12Resource* materialResource_ = nullptr;
-	Vector4* materialData_ = nullptr;
+	Material* materialData_ = nullptr;
 	ID3D12Resource* wvpResource_ = nullptr;
 	Matrix4x4* wvpData_ = nullptr;
 	Transform transform_{};

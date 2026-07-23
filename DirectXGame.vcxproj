@@ -128,7 +128,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Object3D.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
-	<ClCompile Include="Primitive3D.cpp" />
+    <ClCompile Include="Primitive3D.cpp" />
     <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="RasterizerState.cpp" />
     <ClCompile Include="RootSignature.cpp" />
@@ -175,11 +175,12 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="InputLayout.h" />
+    <ClInclude Include="Material.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Object3D.h" />
     <ClInclude Include="ParticleSystem.h" />
-	<ClInclude Include="Primitive3D.h" />
+    <ClInclude Include="Primitive3D.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="RasterizerState.h" />
     <ClInclude Include="RootSignature.h" />

@@ -1,4 +1,4 @@
-///// ----- 自作エンジンの全体構成 ----- /////
+﻿///// ----- 自作エンジンの全体構成 ----- /////
 
 このプロジェクトは、WinMainが全体の順番を管理し、DirectX 12の専門処理を各クラスへ任せる構成にする。
 main.cppには「何をどの順番で行うか」を残し、各クラスには「その処理をどう実現するか」をまとめる。
@@ -220,25 +220,15 @@ PipelineStateは、PSOを構成する次のクラスを所有する。
 各クラスは1種類の設定だけを担当し、PipelineStateがInitializeの順序とPSOへの組み込みを管理する。
 main.cppはPipelineStateを初期化し、描画時にRootSignatureとPSOを取得して使用する。
 
+D3D12_INPUT_ELEMENT_DESC inputElementDescs_[3]{};
+[3]：要素数3の配列
+{}：配列内の全要素をゼロ初期化
+;：宣言の終わり
 
-///// ----- コメントの共通ルール ----- /////
+単位球、位置をそのまま法線として利用すると頂点の向いている方向ともなる
+vertexData[index].normal.x = vertexData[index].position.x;
+vertexData[index].normal.y = vertexData[index].position.y;
+vertexData[index].normal.z = vertexData[index].position.z;
 
-/// --- 大きいタイトル ---
-ファイル、クラス、または大きな機能の開始には次の形式を使う。
-
-///// ----- PSO(Pipeline State Object) ----- /////
-
-/// --- 小見出し ---
-クラス内の初期化、設定、描画、終了処理などには次の形式を使う。
-
-/// --- RootSignature ---
-
-// 何をするか
-実際の処理の直前には、短く分かりやすい説明を書く。
-
-// RootSignatureを作成
-
-コメント内の括弧は、全角ではなく半角の()を使用する。
-既存処理を別ファイルへ移す場合は、その処理に付いていたコメントも一緒に移動する。
-既存コメントへ説明を追加する場合は、元の意味を残した上で追記する。
-順序を表すコメントや説明は1.ではなく1_の形式を使用する。
+Spriteは-zの方向を向きとしておくと良い
+vertexDataSprite[0].normal = {0.0f, 0.0f, -1.0f};
