@@ -72,7 +72,7 @@ void Sphere::Initialize(
 	wvpResource_ =
 		BufferResource::Create(
 			device,
-			sizeof(Matrix4x4)
+			sizeof(TransformationMatrix)
 		);
 
 	hr = wvpResource_->Map(
@@ -83,7 +83,11 @@ void Sphere::Initialize(
 
 	assert(SUCCEEDED(hr));
 
-	*wvpData_ = Matrix4x4::MakeIdentity4x4();
+	// 座標変換用のWVPを単位行列で初期化する
+	wvpData_->WVP = Matrix4x4::MakeIdentity4x4();
+
+	// 法線変換用のWorldも単位行列で初期化する
+	wvpData_->World = Matrix4x4::MakeIdentity4x4();
 }
 
 Transform& Sphere::GetTransform() {
@@ -131,14 +135,17 @@ void Sphere::Update(const Matrix4x4& viewMatrix,
 		);
 
 	// 更新処理でSphere専用WVPを計算する
-	*wvpData_ =
+	// Sphereの頂点をクリップ空間へ変換するWVPを設定する
+	wvpData_->WVP = Matrix4x4::Multiply(
+		worldMatrix,
 		Matrix4x4::Multiply(
-			worldMatrix,
-			Matrix4x4::Multiply(
-			viewMatrix,
-			projectionMatrix
-		)
-		);
+		viewMatrix,
+		projectionMatrix
+	)
+	);
+
+	// ライティングで法線を変換するためのWorld行列を設定する
+	wvpData_->World = worldMatrix;
 }
 
 /// <summary>

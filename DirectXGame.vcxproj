@@ -164,6 +164,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="DepthStencilState.h" />
     <ClInclude Include="DepthStencilView.h" />
     <ClInclude Include="DescriptorHeap.h" />
+    <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="DxcCompiler.h" />
     <ClInclude Include="EditorObject.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
@@ -190,6 +191,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Sphere.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="TextureManager.h" />
+    <ClInclude Include="TransformationMatrix.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="VertexBuffer.h" />
     <ClInclude Include="VertexData.h" />

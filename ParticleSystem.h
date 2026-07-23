@@ -2,6 +2,7 @@
 
 #include "Matrix4x4.h"
 #include "VertexData.h"
+#include "TransformationMatrix.h"
 
 #include <d3d12.h>
 #include <cstdint>

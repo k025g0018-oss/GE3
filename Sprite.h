@@ -3,6 +3,7 @@
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
 #include "Material.h"
+#include "TransformationMatrix.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -55,7 +56,8 @@ private:
 	ID3D12Resource* materialResource_ = nullptr;
 	Material* materialData_ = nullptr;
 	ID3D12Resource* wvpResource_ = nullptr;
-	Matrix4x4* wvpData_ = nullptr;
+	// WVPとWorldをシェーダーへ送る
+	TransformationMatrix* wvpData_ = nullptr;
 	Transform transform_{};
 	uint32_t clientWidth_ = 0;
 	uint32_t clientHeight_ = 0;

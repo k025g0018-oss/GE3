@@ -2,6 +2,7 @@
 
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
+#include "TransformationMatrix.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -74,7 +75,7 @@ private:
 	Vector4* materialData_ = nullptr;
 	// 頂点シェーダーへ渡すWorld・View・Projection行列
 	ID3D12Resource* wvpResource_ = nullptr;
-	Matrix4x4* wvpData_ = nullptr;
+	TransformationMatrix* wvpData_ = nullptr;
 
 	// 図形全体へ適用するTransformと再生状態
 	Transform transform_{};

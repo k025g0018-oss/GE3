@@ -30,6 +30,8 @@
 #include "VertexBuffer.h"
 #include "Sphere.h"
 #include "Camera.h"
+#include "TransformationMatrix.h"
+#include "DirectionalLight.h"
 
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
@@ -958,13 +960,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	pipelineState.Initialize(device, logStream);
 
 	// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
-	ID3D12Resource* wvpResource = BufferResource::Create(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = BufferResource::Create(device, sizeof(TransformationMatrix));
 	// データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	TransformationMatrix* wvpData = nullptr;
 	// 書き込むためのアドレスを取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	// 単位行列を書き込んでおく
-	*wvpData = Matrix4x4::MakeIdentity4x4();
+	wvpData->WVP = Matrix4x4::MakeIdentity4x4();
+	wvpData->World = Matrix4x4::MakeIdentity4x4();
 
 	///// ----- VertexBuffer ----- /////
 
@@ -978,8 +981,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	///// ----- Sprite ----- /////
 
-	/// --- 初期化 ---
-	// Sprite専用のVertexBuffer、Material、WVPを作成
+	///// ----- 初期化 ----- /////
+	/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
 	// 2D専用オブジェクトであることが分かる名前に統一する
 	Sprite2D sprite2D;
 	sprite2D.Initialize(device, kClientWidth, kClientHeight, 640.0f, 360.0f);
@@ -989,7 +992,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Spriteの描画を個別に切り替える
 	bool isSpriteVisible = true;
 
-	/// Material用のリソースを作る
+	/// --- Material用のリソースを作る ---
 	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Vector4));
 	// マテリアルにデータを書き込む
 	Vector4* materialData = nullptr;
@@ -998,7 +1001,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 色書き込み
 	*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	/// Resourceのデータを書き込む
+	/// --- 平行光源用の定数バッファを作成する ---
+	ID3D12Resource* directionalLightResource =
+		BufferResource::Create(device, sizeof(DirectionalLight));
+	// CPUから光源情報を書き込むアドレス
+	DirectionalLight* directionalLightData = nullptr;
+	HRESULT directionalLightMapResult =
+		directionalLightResource->Map(
+			0,
+			nullptr,
+			reinterpret_cast<void**>(&directionalLightData)
+		);
+
+	assert(SUCCEEDED(directionalLightMapResult));
+
+	// デフォルト値
+	// 平行光源の色を白に設定する
+	directionalLightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
+	// 真下へ進む単位ベクトルを設定する
+	directionalLightData->direction = {0.0f, -1.0f, 0.0f};
+	// 平行光源の明るさを設定する
+	directionalLightData->intensity = 1.0f;
+
+	/// --- Resourceのデータを書き込む ---
 	// データを書き込む
 	VertexData* vertexData = vertexBuffer.GetData();
 	// 書き込むためのアドレスを取得
@@ -1603,7 +1628,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
 
 			// wvp行列をGPUに送る
-			*wvpData = worldViewProjectionMatrix;
+			// 頂点座標をクリップ空間へ変換する行列を送る
+			wvpData->WVP = worldViewProjectionMatrix;
+
+			// ライティングで法線を変換するWorld行列を送る
+			wvpData->World = worldMatrix;
 
 			///// ----- ImGui中身 ----- /////
 #ifdef USE_IMGUI
@@ -1888,6 +1917,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// wvp用のBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			// 平行光源をPixel Shaderのb1へ設定する
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 
 			// 画像を指定
 			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle =
@@ -1987,6 +2018,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	particleSystem.Finalize();
 	wvpResource->Release();
 	materialResource->Release();
+	// 平行光源のリソースを解放する
+	directionalLightResource->Release();
+
 	// 読み込んだテクスチャをすべて解放する
 	textureManager.Finalize();
 	depthStencilView.Finalize();

@@ -43,7 +43,7 @@ void Sprite2D::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t c
 
 	/// --- WVPResource ---
 	// Sprite専用のWVPを保存するConstantBufferを作成
-	wvpResource_ = BufferResource::Create(device, sizeof(Matrix4x4));
+	wvpResource_ = BufferResource::Create(device, sizeof(TransformationMatrix));
 	hr = wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));
 	assert(SUCCEEDED(hr));
 
@@ -79,10 +79,14 @@ void Sprite2D::Update() {
 		100.0f
 	);
 
-	*wvpData_ = Matrix4x4::Multiply(
+	// 頂点の座標変換に使用するWVPを設定する
+	wvpData_->WVP = Matrix4x4::Multiply(
 		worldMatrix,
 		Matrix4x4::Multiply(viewMatrix, projectionMatrix)
 	);
+
+	// 法線をワールド空間へ変換するため、Worldも送る
+	wvpData_->World = worldMatrix;
 }
 
 /// --- 描画 ---

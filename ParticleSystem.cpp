@@ -127,9 +127,12 @@ void ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x
 			Matrix4x4::Multiply(viewMatrix, projectionMatrix)
 		);
 
-		// Particleごとに別の256バイト領域へWVPを書き込む
+		// ParticleごとにWVPとWorldを書き込む
 		uint8_t* currentWvpData = particleWvpData_ + (kConstantBufferAlignment * i);
-		*reinterpret_cast<Matrix4x4*>(currentWvpData) = particleWvp;
+		TransformationMatrix* transformationData =
+			reinterpret_cast<TransformationMatrix*>(currentWvpData);
+		transformationData->WVP = particleWvp;
+		transformationData->World = worldMatrix;
 
 		// Particleごとに別のConstantBufferViewを指定する
 		const D3D12_GPU_VIRTUAL_ADDRESS currentWvpAddress =

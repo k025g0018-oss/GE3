@@ -47,10 +47,11 @@ void Primitive3D::Initialize(ID3D12Device* device) {
 	*materialData_ = {1.0f, 1.0f, 1.0f, 1.0f};
 
 	// Primitive3D専用のWVP定数バッファを作る
-	wvpResource_ = BufferResource::Create(device, sizeof(Matrix4x4));
+	wvpResource_ = BufferResource::Create(device, sizeof(TransformationMatrix));
 	hr = wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));
 	assert(SUCCEEDED(hr));
-	*wvpData_ = Matrix4x4::MakeIdentity4x4();
+	wvpData_->WVP = Matrix4x4::MakeIdentity4x4();
+	wvpData_->World = Matrix4x4::MakeIdentity4x4();
 	Reset();
 }
 
@@ -65,7 +66,10 @@ void Primitive3D::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectio
 
 	// Primitive3D専用のWorld行列からWVPを計算する
 	const Matrix4x4 worldMatrix = Matrix4x4::MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
-	*wvpData_ = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
+	// 頂点位置をクリップ空間へ変換する行列
+	wvpData_->WVP = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
+	// ライティングで法線を変換するための行列
+	wvpData_->World = worldMatrix;
 }
 
 void Primitive3D::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) const {

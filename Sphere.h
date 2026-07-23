@@ -1,6 +1,7 @@
 #pragma once
 #include "Matrix4x4.h"
 #include "VertexBuffer.h"
+#include "TransformationMatrix.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -60,7 +61,7 @@ private:
 
 	// Sphere専用WVP
 	ID3D12Resource* wvpResource_ = nullptr;
-	Matrix4x4* wvpData_ = nullptr;
+	TransformationMatrix* wvpData_ = nullptr;
 
 	Transform transform_{};
 	uint32_t subdivision_ = 16;
