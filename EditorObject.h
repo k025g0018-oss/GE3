@@ -6,6 +6,7 @@
 #include "ParticleSystem.h"
 #include "Sprite.h"
 #include "Sphere.h"
+#include "Model.h"
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -79,6 +80,37 @@ private:
 	int& textureMode_;
 
 	// Sphereを描画するかどうかをmainと共有する
+	bool& isVisible_;
+};
+
+// OBJモデルをHierarchyとPropertiesへ接続するラッパークラス
+class ModelEditorObject final : public IEditorObject {
+public:
+	// モデル本体と表示設定を参照として受け取る
+	ModelEditorObject(
+		Model& model,
+		const char* name,
+		int& textureMode,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// Propertiesから編集するOBJモデルを保持する
+	Model& model_;
+
+	// Hierarchyへ表示するモデル名を保持する
+	const char* name_;
+
+	// モデル専用のTexture選択番号を保持する
+	int& textureMode_;
+
+	// モデルを描画するかどうかをmainと共有する
 	bool& isVisible_;
 };
 

@@ -38,6 +38,8 @@ ModelData ModelLoader::LoadObjFile(
 			// 頂点位置を読み込む
 			Vector4 position;
 			lineStream >> position.x >> position.y >> position.z;
+			// 右手座標系から左手座標系へ変換する
+			position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 
@@ -45,16 +47,24 @@ ModelData ModelLoader::LoadObjFile(
 			// テクスチャ座標を読み込む
 			Vector2 texcoord;
 			lineStream >> texcoord.x >> texcoord.y;
+			// モデルのX反転に合わせてUVも左右反転する
+			texcoord.x = 1.0f - texcoord.x;
+			// UVの原点を左下から左上へ変換する
+			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);
 
 		} else if (identifier == "vn") {
 			// 頂点法線を読み込む
 			Vector3 normal;
 			lineStream >> normal.x >> normal.y >> normal.z;
+			// 頂点位置と同様に法線も左手座標系へ変換する
+			normal.x *= -1.0f;
 			normals.push_back(normal);
 
 		} else if (identifier == "f") {
 			/// --- 三角形を作る ---
+			VertexData triangle[3];
+
 			// 面を構成する3頂点を読み込む 面は三角形限定。ほかは未対応
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex) {
 				std::string vertexDefinition;
@@ -73,9 +83,23 @@ ModelData ModelLoader::LoadObjFile(
 				Vector4 position = positions[elementIndices[0] - 1];
 				Vector2 texcoord = texcoords[elementIndices[1] - 1];
 				Vector3 normal = normals[elementIndices[2] - 1];
-				VertexData vertex = {position, texcoord, normal};
-				modelData.vertices.push_back(vertex);
+				// VertexData vertex = {position, texcoord, normal};
+				// modelData.vertices.push_back(vertex);
+
+				triangle[faceVertex] = {position, texcoord, normal};
 			}
+
+			// 頂点を逆順で登録することで、回り順を逆にする
+			/*
+			modelData.vertices.push_back(triangle[2]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[0]);
+			*/
+
+			// 現在のプロジェクトでは、RasterizerState.cppで裏面カリングが有効 なので0,1,2で初期状態で表面になる
+			modelData.vertices.push_back(triangle[0]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[2]);
 		}
 	}
 

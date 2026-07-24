@@ -1,17 +1,3 @@
-#include <windows.h>
-#include <cstdint> // int32_t
-#include <string> // 文字列
-#include <format>
-#include <filesystem> // ファイルやディレクトリに関する操作を行うライブラリ
-#include <fstream> // ファイルに書いたり読んだりするライブラリ
-#include <chrono> // 時間を扱うライブラリ
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <cassert>
-#include <dbghelp.h> // Debug用のあれやこれやを使えるようにする
-#include <strsafe.h> // StringCchPrintfWの利用に必要
-#include <dxgidebug.h>
-#include <dxcapi.h>
 #include "Matrix4x4.h"
 #include "Primitive3D.h"
 #include "Vector.h"
@@ -33,12 +19,29 @@
 #include "TransformationMatrix.h"
 #include "DirectionalLight.h"
 #include "Material.h"
+#include "ModelLoader.h"
+#include "Model.h"
 
+#include <windows.h>
+#include <cstdint> // int32_t
+#include <string> // 文字列
+#include <format>
+#include <filesystem> // ファイルやディレクトリに関する操作を行うライブラリ
+#include <fstream> // ファイルに書いたり読んだりするライブラリ
+#include <chrono> // 時間を扱うライブラリ
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <cassert>
+#include <dbghelp.h> // Debug用のあれやこれやを使えるようにする
+#include <strsafe.h> // StringCchPrintfWの利用に必要
+#include <dxgidebug.h>
+#include <dxcapi.h>
 #include <filesystem> // フォルダとファイルを列挙するため
 #include <string>     // ファイル名をstd::stringで扱うため
 #include <system_error> // フォルダ列挙エラーを安全に受け取るため
 #include <vector> // ImGuiが使用するSRV番号を管理するため
 #include <cmath>
+#include <cstring>
 
 // ImGui
 #ifdef USE_IMGUI
@@ -1037,32 +1040,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 書き込むためのアドレスを取得
 	// VertexBufferの初期化時にMapしたアドレスを使用する
 
-	/*
-	/// 三角形1個目
-	// 左下
-	vertexData[0].position = {-0.5f, -0.5f, 0.0f, 1.0f};
-	vertexData[0].texcoord = {0.0f, 1.0f};
-	// 上
-	vertexData[1].position = {0.0f, 0.5f, 0.0f, 1.0f};
-	vertexData[1].texcoord = {0.5f, 0.0f};
-	// 右下
-	vertexData[2].position = {0.5f, -0.5f, 0.0f, 1.0f};
-	vertexData[2].texcoord = {1.0f, 1.0f};
-	*/
-
-	/*
-	/// 三角形2個目
-	// 左下
-	vertexData[3].position = {-0.5f, -0.5f, 0.5f, 1.0f};
-	vertexData[3].texcoord = {0.0f, 1.0f};
-	// 上
-	vertexData[4].position = {0.0f, 0.0f, 0.0f, 1.0f};
-	vertexData[4].texcoord = {0.5f, 0.0f};
-	// 右下
-	vertexData[5].position = {0.5f, -0.5f, -0.5f, 1.0f};
-	vertexData[5].texcoord = {1.0f, 1.0f};
-	*/
-
 	// 三角錐を構成する
 	VertexData pyramidVertices[12] = {
 		// 前面
@@ -1201,7 +1178,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			transform.translate
 		);
 
-	/// --- 球 (Sphere) ---
+	///// ----- 球 (Sphere) ----- /////
 	Sphere sphere;
 
 	// ImGuiでは1～32分割まで変更できるようにする
@@ -1211,6 +1188,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	int sphereTextureMode = 3;
 	// Sphereの描画を個別に切り替える
 	bool isSphereVisible = true;
+
+	///// ----- OBJ Model ----- /////
+
+	Model planeModel;
+
+	// resourcesフォルダのplane.objを読み込む
+	planeModel.Initialize(
+		device,
+		"resources",
+		"plane.obj"
+	);
+
+	// 平面モデルの表示を切り替える
+	bool isPlaneVisible = true;
+
+	// 平面モデルで使用するテクスチャ番号
+	int planeTextureMode = 1;
 
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
@@ -1282,6 +1276,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
 	// SphereとSphere専用Texture番号をEditorへ接続する
 	SphereEditorObject sphereEditor(sphere, sphereTextureMode, isSphereVisible);
+	// OBJ平面と平面専用の表示設定をEditorへ接続する
+	ModelEditorObject planeModelEditor(
+		planeModel,
+		"Plane Model",
+		planeTextureMode,
+		isPlaneVisible
+	);
 	std::vector<IEditorObject*> editorObjects = {
 		// Primitive3Dの直後に、関連するSceneのモード設定を並べる
 		&primitive3DEditor,
@@ -1289,6 +1290,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		&particleEditor,
 		// 独立した描画オブジェクトはHierarchyの後ろへ並べる
 		&sphereEditor,
+		&planeModelEditor,
 		&sprite2DEditor
 	};
 	IEditorObject* selectedObject = nullptr;
@@ -1679,6 +1681,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				projectionMatrix
 			);
 
+			// OBJ平面専用のWVPを更新する
+			planeModel.Update(
+				viewMatrix,
+				projectionMatrix
+			);
+
 			// Object3D用WVPを計算する
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
@@ -2012,6 +2020,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				sphere.Draw(commandList, sphereTextureHandle);
 			}
 
+			/// --- OBJ平面描画 ---
+			if (isPlaneVisible) {
+				// 平面モデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE planeTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(planeTextureMode)
+					);
+
+				// OBJから読み込んだ平面を描画する
+				planeModel.Draw(
+					commandList,
+					planeTextureHandle
+				);
+			}
+
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
 			if (isSpriteVisible) {
@@ -2070,6 +2093,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	primitive3D.Finalize();
 	// 球
 	sphere.Finalize();
+	// OBJ平面のリソースを解放する
+	planeModel.Finalize();
 	sprite2D.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();

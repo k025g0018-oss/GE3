@@ -249,4 +249,87 @@ void SphereEditorObject::DrawProperties() {
 	);
 }
 
+///// ----- OBJ Model ----- /////
+ModelEditorObject::ModelEditorObject(
+	Model& model,
+	const char* name,
+	int& textureMode,
+	bool& isVisible)
+	: model_(model),
+	name_(name),
+	textureMode_(textureMode),
+	isVisible_(isVisible) {
+}
+
+void ModelEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("OBJ Model Control");
+
+	// OBJモデルの描画だけを個別にON/OFFする
+	ImGui::Checkbox("Draw Model", &isVisible_);
+
+	// モデルのライティングを個別にON/OFFする
+	bool enableLighting =
+		model_.IsLightingEnabled();
+
+	if (ImGui::Checkbox(
+		"Enable Lighting",
+		&enableLighting
+	)) {
+		model_.SetLightingEnabled(enableLighting);
+	}
+
+	if (enableLighting) {
+		const char* lightingModes[] = {
+			"Lambert",
+			"Half Lambert"
+		};
+
+		// ライティングが有効な場合だけ方式を選択できるようにする
+		ImGui::Combo(
+			"Lighting Mode",
+			&model_.GetLightingMode(),
+			lightingModes,
+			IM_ARRAYSIZE(lightingModes)
+		);
+	}
+
+	// OBJモデルへ貼るTextureを選択する
+	ImGui::Combo(
+		"Texture Mode",
+		&textureMode_,
+		kTextureModes,
+		IM_ARRAYSIZE(kTextureModes)
+	);
+
+	ImGui::Separator();
+
+	// モデルの拡縮・回転・移動をPropertiesから編集する
+	Transform& transform =
+		model_.GetTransform();
+
+	ImGui::DragFloat3(
+		"Scale",
+		&transform.scale.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Rotate",
+		&transform.rotate.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Translate",
+		&transform.translate.x,
+		0.01f
+	);
+
+	// OBJファイルから読み込んだ頂点数を確認できるようにする
+	ImGui::Text(
+		"Vertex Count: %u",
+		model_.GetVertexCount()
+	);
+}
+
 #endif // USE_IMGUI
