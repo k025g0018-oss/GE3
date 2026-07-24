@@ -1,13 +1,14 @@
 #include "Object3d.hlsli"
 
 #define float32_t4 float4
+#define float32_t4x4 float4x4
 #define float32_t3 float3
 #define int32_t int
 
 struct Material {
     float32_t4 color;
     int32_t enableLighting;
-    float32_t3 uvTransform;
+    float32_t4x4 uvTransform;
     
     // 0: Lambert、1: Half Lambert
     int32_t lightingMode;
@@ -28,9 +29,6 @@ ConstantBuffer<Material> gMaterial : register(b0);
 // 平行光源をPixel Shaderのb1で受け取る
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
-float3 transformedUV = mul(float32_t3(input.texcoord, 1.0f), gMaterial.uvTransform);
-float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-
 struct PixelShaderOutput {
     float32_t4 color : SV_TARGET0;
 };
@@ -39,9 +37,9 @@ PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
     
+    float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
    // テクスチャから色を取得する
-    float32_t4 textureColor =
-        gTexture.Sample(gSampler, input.texcoord);
+    float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
 
     if (gMaterial.enableLighting != 0)
     {

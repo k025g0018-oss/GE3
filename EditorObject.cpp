@@ -89,6 +89,33 @@ void Sprite2DEditorObject::DrawProperties() {
 	if (ImGui::Button("Reset Sprite")) {
 		sprite_.Reset();
 	}
+
+	Transform& uvTransform =
+		sprite_.GetUVTransform();
+
+	// UVの平行移動を編集する
+	ImGui::DragFloat2(
+		"UV Translate",
+		&uvTransform.translate.x,
+		0.01f,
+		-10.0f,
+		10.0f
+	);
+
+	// UVの拡大縮小を編集する
+	ImGui::DragFloat2(
+		"UV Scale",
+		&uvTransform.scale.x,
+		0.01f,
+		-10.0f,
+		10.0f
+	);
+
+	// UVのZ軸回転を編集する
+	ImGui::SliderAngle(
+		"UV Rotate",
+		&uvTransform.rotate.z
+	);
 }
 
 ParticleEditorObject::ParticleEditorObject(ParticleSystem& particleSystem)

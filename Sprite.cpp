@@ -130,6 +130,18 @@ void Sprite2D::Update() {
 		100.0f
 	);
 
+	// ImGuiで設定されたSRTからUV Transform行列を作成する
+	materialData_->uvTransform =
+		Matrix4x4::MakeAffineMatrix(
+			uvTransform_.scale,
+			{0.0f, 0.0f, uvTransform_.rotate.z},
+		{
+			uvTransform_.translate.x,
+			uvTransform_.translate.y,
+			0.0f
+		}
+		);
+
 	// 頂点の座標変換に使用するWVPを設定する
 	wvpData_->WVP = Matrix4x4::Multiply(
 		worldMatrix,
@@ -177,7 +189,16 @@ void Sprite2D::Reset() {
 
 		// SpriteにはLightingを適用しない
 		materialData_->enableLighting = false;
+
+		// 初期状態ではUV座標を変化させない
+		materialData_->uvTransform =
+			Matrix4x4::MakeIdentity4x4();
 	}
+
+	// UV Transformの操作値を初期状態へ戻す
+	uvTransform_.scale = {1.0f, 1.0f, 1.0f};
+	uvTransform_.rotate = {0.0f, 0.0f, 0.0f};
+	uvTransform_.translate = {0.0f, 0.0f, 0.0f};
 }
 
 /// --- 終了処理 ---

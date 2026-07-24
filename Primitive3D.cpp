@@ -93,6 +93,10 @@ void Primitive3D::Initialize(ID3D12Device* device) {
 	// 初期状態ではLambertを使用する
 	materialData_->lightingMode = 0;
 
+	// 初期状態ではUV座標を変化させない
+	materialData_->uvTransform =
+		Matrix4x4::MakeIdentity4x4();
+
 	// Primitive3D専用のWVP定数バッファを作る
 	wvpResource_ = BufferResource::Create(device, sizeof(TransformationMatrix));
 	hr = wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));

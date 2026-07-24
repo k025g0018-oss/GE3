@@ -1005,6 +1005,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	{1.0f, 1.0f, 1.0f, 1.0f};
 	// main側の頂点法線が未設定なので一旦無効にする
 	materialData->enableLighting = false;
+	// 初期状態ではUV座標を変化させない
+	materialData->uvTransform =
+		Matrix4x4::MakeIdentity4x4();
 
 	/// --- 平行光源用の定数バッファを作成する ---
 	ID3D12Resource* directionalLightResource =
@@ -1352,14 +1355,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
 			const ImGuiID dockspaceId = ImGui::GetID("MainEditorDockSpace");
 
-			// サイズ変更中も右側・下側が画面外へ押し出されないよう、現在サイズで比率を再計算する
-			static ImVec2 previousViewportSize(0.0f, 0.0f);
-			const bool isViewportSizeChanged =
-				previousViewportSize.x != mainViewport->Size.x ||
-				previousViewportSize.y != mainViewport->Size.y;
-			if (isViewportSizeChanged) {
-				SetupDefaultDockLayout(dockspaceId, mainViewport->Size);
-				previousViewportSize = mainViewport->Size;
+			// 保存されたDock配置がない場合だけ、デフォルト配置を作成する
+			if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+				SetupDefaultDockLayout(
+					dockspaceId,
+					mainViewport->Size
+				);
 			}
 
 			// Dockノードを組み直したあとにViewportへ登録する

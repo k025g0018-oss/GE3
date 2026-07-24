@@ -98,6 +98,10 @@ void Sphere::Initialize(
 	// 初期状態ではLambertを使用する
 	materialData_->lightingMode = 0;
 
+	// 初期状態ではUV座標を変化させない
+	materialData_->uvTransform =
+		Matrix4x4::MakeIdentity4x4();
+
 	// Sphere専用のWVP Resourceを作成する
 	wvpResource_ =
 		BufferResource::Create(

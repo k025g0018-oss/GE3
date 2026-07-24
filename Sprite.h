@@ -9,7 +9,6 @@
 #include <cstdint>
 
 ///// ----- Sprite ----- /////
-
 class Sprite2D {
 public:
 	Sprite2D() = default;
@@ -41,6 +40,11 @@ public:
 		return materialData_->color;
 	}
 
+	// ImGuiからUV Transformを変更する
+	Transform& GetUVTransform() {
+		return uvTransform_;
+	}
+
 	/// --- リセット ---
 	// SRTと色を初期値へ戻す
 	void Reset();
@@ -50,6 +54,13 @@ public:
 	void Finalize();
 
 private:
+	// SpriteのTextureへ適用するUV座標変換
+	Transform uvTransform_{
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+
 	// Spriteを構成する重複なしの頂点数
 	static constexpr uint32_t kVertexCount = 4;
 	// 2つの三角形を構成するインデックス数
