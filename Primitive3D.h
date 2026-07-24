@@ -67,6 +67,11 @@ public:
 		return displayMode_;
 	}
 
+	// ImGuiからライティング方式を直接変更する
+	int32_t& GetLightingMode() {
+		return materialData_->lightingMode;
+	}
+
 	///// ----- モードごとの個別Transform ----- /////
 	// 三角形を2枚表示するモードで、それぞれを個別に操作する
 	float* GetTriangle1Scale() {

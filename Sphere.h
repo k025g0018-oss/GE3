@@ -48,6 +48,10 @@ public:
 	Transform& GetTransform();
 	uint32_t GetSubdivision() const;
 	uint32_t GetVertexCount() const;
+	// ImGuiからライティング方式を直接変更する
+	int32_t& GetLightingMode() {
+		return materialData_->lightingMode;
+	}
 
 	// Sphereのライティング設定を取得する
 	bool IsLightingEnabled() const {

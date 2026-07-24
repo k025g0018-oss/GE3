@@ -68,6 +68,9 @@ void Sphere::Initialize(
 	// まずはSphereだけライティングを有効にする
 	materialData_->enableLighting = true;
 
+	// 初期状態ではLambertを使用する
+	materialData_->lightingMode = 0;
+
 	// Sphere専用のWVP Resourceを作成する
 	wvpResource_ =
 		BufferResource::Create(

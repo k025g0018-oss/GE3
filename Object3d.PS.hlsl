@@ -7,6 +7,9 @@
 struct Material {
     float32_t4 color;
     int32_t enableLighting;
+    
+    // 0: Lambert、1: Half Lambert
+    int32_t lightingMode;
 };
 
 // 平行光源の情報
@@ -41,11 +44,21 @@ PixelShaderOutput main(VertexShaderOutput input)
         // 補間後の法線を再度正規化する
         float32_t3 normal = normalize(input.normal);
 
-        // 法線と光が来る方向の内積から明るさを求める
-        float lightingCos = saturate(
-            dot(normal, -gDirectionalLight.direction)
-        );
+        // 法線とライト側への方向の内積を求める
+        float NdotL = dot(normal, -gDirectionalLight.direction);
 
+        float lightingCos;
+        if (gMaterial.lightingMode == 0)
+        {
+            // Lambertでは、裏側の明るさが負にならないように0以上へ制限する
+            lightingCos = saturate(NdotL);
+        }
+        else
+        {
+            // Half Lambertでは内積を[0, 1]へ変換し、2乗して陰影を調整する
+            lightingCos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        }
+        
         // マテリアル・テクスチャ・光源色・明るさを合成する
         output.color =
             gMaterial.color *

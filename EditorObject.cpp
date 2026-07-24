@@ -29,6 +29,22 @@ void Primitive3DEditorObject::DrawProperties() {
 	if (ImGui::Checkbox("Enable Lighting", &enableLighting)) {
 		object_.SetLightingEnabled(enableLighting);
 	}
+
+	if (enableLighting) {
+		const char* lightingModes[] = {
+			"Lambert",
+			"Half Lambert"
+		};
+
+		// Materialの値を直接変更し、シェーダーへ反映する
+		ImGui::Combo(
+			"Lighting Mode",
+			&object_.GetLightingMode(),
+			lightingModes,
+			IM_ARRAYSIZE(lightingModes)
+		);
+	}
+
 	ImGui::Separator();
 
 	// 図形全体へ適用するTransformを編集する
@@ -150,6 +166,21 @@ void SphereEditorObject::DrawProperties() {
 	// Sphereのライティングを個別に切り替える
 	bool enableLighting =
 		sphere_.IsLightingEnabled();
+
+	if (enableLighting) {
+		const char* lightingModes[] = {
+			"Lambert",
+			"Half Lambert"
+		};
+
+		// Sphereに使用するライティング方式を切り替える
+		ImGui::Combo(
+			"Sphere Lighting Mode",
+			&sphere_.GetLightingMode(),
+			lightingModes,
+			IM_ARRAYSIZE(lightingModes)
+		);
+	}
 
 	// Checkboxが変更されたときだけMaterialへ反映する
 	if (ImGui::Checkbox(
