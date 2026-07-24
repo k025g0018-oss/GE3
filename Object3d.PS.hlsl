@@ -7,6 +7,7 @@
 struct Material {
     float32_t4 color;
     int32_t enableLighting;
+    float32_t3 uvTransform;
     
     // 0: Lambert、1: Half Lambert
     int32_t lightingMode;
@@ -26,6 +27,9 @@ ConstantBuffer<Material> gMaterial : register(b0);
 
 // 平行光源をPixel Shaderのb1で受け取る
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
+
+float3 transformedUV = mul(float32_t3(input.texcoord, 1.0f), gMaterial.uvTransform);
+float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
 
 struct PixelShaderOutput {
     float32_t4 color : SV_TARGET0;
