@@ -28,14 +28,41 @@ void Sphere::Initialize(
 	maxSubdivision_ = (std::max)(maxSubdivision, 1u);
 
 	// 最大分割数から、事前に必要な最大頂点数を計算する
-	const uint32_t maxVertexCount =
-		maxSubdivision_ * maxSubdivision_ * 6;
+	// 緯度と経度の両端を含むため、それぞれ分割数より1頂点多くなる
+	const uint32_t maxVertexCount = (maxSubdivision_ + 1) * (maxSubdivision_ + 1);
+	// 各区画は2三角形、合計6インデックスで構成する
+	const uint32_t maxIndexCount = maxSubdivision_ * maxSubdivision_ * 6;
 
 	// ImGuiで分割数を変えても再確保しなくてよいように最大数で確保する
 	vertexBuffer_.Initialize(device, maxVertexCount);
 
 	// 初期分割数が最大値を超えないようにする
 	subdivision_ = (std::min)(16u, maxSubdivision_);
+
+	// 最大分割数で必要になるIndex Resourceを確保する
+	indexResource_ = BufferResource::Create(
+		device,
+		sizeof(uint32_t) * maxIndexCount
+	);
+
+	// GenerateVerticesから書き込めるように、アドレスをメンバーへ保存する
+	HRESULT hr = indexResource_->Map(
+		0,
+		nullptr,
+		reinterpret_cast<void**>(&indexData_)
+	);
+	assert(SUCCEEDED(hr));
+
+	// Index Resourceの先頭アドレスを設定する
+	indexBufferView_.BufferLocation =
+		indexResource_->GetGPUVirtualAddress();
+
+	// 確保したIndex Resource全体のサイズを設定する
+	indexBufferView_.SizeInBytes =
+		sizeof(uint32_t) * maxIndexCount;
+
+	// インデックスはuint32_tとして扱う
+	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
 
 	transform_ = {
 		{1.0f, 1.0f, 1.0f},
@@ -52,7 +79,7 @@ void Sphere::Initialize(
 			sizeof(Material)
 		);
 
-	HRESULT hr = materialResource_->Map(
+	hr = materialResource_->Map(
 		0,
 		nullptr,
 		reinterpret_cast<void**>(&materialData_)
@@ -174,6 +201,9 @@ void Sphere::Draw(
 		&vertexBufferView
 	);
 
+	// SphereのIndexBufferViewを設定する
+	commandList->IASetIndexBuffer(&indexBufferView_);
+
 	commandList->IASetPrimitiveTopology(
 		D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST
 	);
@@ -196,21 +226,22 @@ void Sphere::Draw(
 		textureHandle
 	);
 
-	commandList->DrawInstanced(
-		vertexCount_,
-		1,
-		0,
-		0
-	);
+	// 現在の分割数に必要なインデックスを使ってSphereを描画する
+	commandList->DrawIndexedInstanced(indexCount_, 1, 0, 0, 0);
 }
 
 void Sphere::GenerateVertices() {
-	// 現在の分割数から、実際に描画する頂点数を計算する
-	vertexCount_ = subdivision_ * subdivision_ * 6;
+	// 緯度と経度の両端を含む頂点数を計算する
+	const uint32_t vertexPerRow = subdivision_ + 1;
+	vertexCount_ = vertexPerRow * vertexPerRow;
+
+	// 1区画につき6インデックスを使用する
+	indexCount_ = subdivision_ * subdivision_ * 6;
 
 	// Initialize時にMapされた頂点データの書き込み先を取得する
 	VertexData* vertexData = vertexBuffer_.GetData();
 	assert(vertexData != nullptr);
+	assert(indexData_ != nullptr);
 
 	const float pi = std::numbers::pi_v<float>;
 
@@ -221,139 +252,85 @@ void Sphere::GenerateVertices() {
 	const float latEvery =
 		pi / static_cast<float>(subdivision_);
 
-	// 緯度方向を-π/2からπ/2まで分割する
+	// 緯度と経度の交点ごとに、重複しない頂点データを作成する 緯度方向を-π/2からπ/2まで分割する
+	// 緯度と経度の交点ごとに頂点を生成する
 	for (uint32_t latIndex = 0;
-		latIndex < subdivision_;
+		latIndex <= subdivision_;
 		++latIndex) {
 
-		const float lat0 =
-			-pi / 2.0f + latEvery * latIndex;
+		const float lat =
+			-pi / 2.0f +
+			latEvery * static_cast<float>(latIndex);
 
-		const float lat1 = lat0 + latEvery;
-
-		// 球の下がv=1、上がv=0になるように計算する
-		const float v0 =
+		const float v =
 			1.0f -
 			static_cast<float>(latIndex) /
 			static_cast<float>(subdivision_);
 
-		const float v1 =
-			1.0f -
-			static_cast<float>(latIndex + 1) /
-			static_cast<float>(subdivision_);
+		for (uint32_t lonIndex = 0;
+			lonIndex <= subdivision_;
+			++lonIndex) {
 
-		// 経度方向を0から2πまで分割する
+			const float lon =
+				lonEvery * static_cast<float>(lonIndex);
+
+			const float u =
+				static_cast<float>(lonIndex) /
+				static_cast<float>(subdivision_);
+
+			const Vector4 position = {
+				std::cos(lat) * std::cos(lon),
+				std::sin(lat),
+				std::cos(lat) * std::sin(lon),
+				1.0f
+			};
+
+			const uint32_t vertexIndex =
+				latIndex * vertexPerRow +
+				lonIndex;
+
+			// 単位球では座標のXYZをそのまま法線として使用できる
+			vertexData[vertexIndex] = {
+				position,
+				{u, v},
+				{position.x, position.y, position.z}
+			};
+		}
+	}
+
+	// 生成済みの頂点番号を使って、各区画のインデックスを生成する
+	for (uint32_t latIndex = 0;
+		latIndex < subdivision_;
+		++latIndex) {
+
 		for (uint32_t lonIndex = 0;
 			lonIndex < subdivision_;
 			++lonIndex) {
 
-			const float lon0 = lonEvery * lonIndex;
-			const float lon1 = lon0 + lonEvery;
+			const uint32_t a =
+				latIndex * vertexPerRow +
+				lonIndex;
 
-			const float u0 =
-				static_cast<float>(lonIndex) /
-				static_cast<float>(subdivision_);
+			const uint32_t b = a + 1;
 
-			const float u1 =
-				static_cast<float>(lonIndex + 1) /
-				static_cast<float>(subdivision_);
+			const uint32_t c =
+				(latIndex + 1) * vertexPerRow +
+				lonIndex;
 
-			// 1区画6頂点の書き込み開始位置
-			const uint32_t startIndex =
+			const uint32_t d = c + 1;
+
+			const uint32_t indexStart =
 				(latIndex * subdivision_ + lonIndex) * 6;
 
-			// 1区画を構成する4つの基準点
-			const Vector4 a = {
-				std::cos(lat0) * std::cos(lon0),
-				std::sin(lat0),
-				std::cos(lat0) * std::sin(lon0),
-				1.0f
-			};
+			// 1つ目の三角形：a-c-b
+			indexData_[indexStart + 0] = a;
+			indexData_[indexStart + 1] = c;
+			indexData_[indexStart + 2] = b;
 
-			const Vector4 b = {
-				std::cos(lat0) * std::cos(lon1),
-				std::sin(lat0),
-				std::cos(lat0) * std::sin(lon1),
-				1.0f
-			};
-
-			const Vector4 c = {
-				std::cos(lat1) * std::cos(lon0),
-				std::sin(lat1),
-				std::cos(lat1) * std::sin(lon0),
-				1.0f
-			};
-
-			const Vector4 d = {
-				std::cos(lat1) * std::cos(lon1),
-				std::sin(lat1),
-				std::cos(lat1) * std::sin(lon1),
-				1.0f
-			};
-
-			/*
-			// 1枚目の三角形 a-b-c
-			vertexData[startIndex + 0] = {
-				a, {u0, v0}
-			};
-			vertexData[startIndex + 1] = {
-				b, {u1, v0}
-			};
-			vertexData[startIndex + 2] = {
-				c, {u0, v1}
-			};
-
-			// 2枚目の三角形 c-b-d
-			vertexData[startIndex + 3] = {
-				c, {u0, v1}
-			};
-			vertexData[startIndex + 4] = {
-				b, {u1, v0}
-			};
-			vertexData[startIndex + 5] = {
-				d, {u1, v1}
-			};
-			*/
-
-			// 1枚目_a-c-b
-			// 単位球では頂点座標のXYZが外向き法線になる
-			vertexData[startIndex + 0] = {
-				a,
-				{u0, v0},
-				{a.x, a.y, a.z}
-			};
-
-			vertexData[startIndex + 1] = {
-				c,
-				{u0, v1},
-				{c.x, c.y, c.z}
-			};
-
-			vertexData[startIndex + 2] = {
-				b,
-				{u1, v0},
-				{b.x, b.y, b.z}
-			};
-
-			// 2枚目_c-d-b
-			vertexData[startIndex + 3] = {
-				c,
-				{u0, v1},
-				{c.x, c.y, c.z}
-			};
-
-			vertexData[startIndex + 4] = {
-				d,
-				{u1, v1},
-				{d.x, d.y, d.z}
-			};
-
-			vertexData[startIndex + 5] = {
-				b,
-				{u1, v0},
-				{b.x, b.y, b.z}
-			};
-			
+			// 2つ目の三角形：c-d-b
+			indexData_[indexStart + 3] = c;
+			indexData_[indexStart + 4] = d;
+			indexData_[indexStart + 5] = b;
 		}
 	}
 }
@@ -382,4 +359,14 @@ void Sphere::Finalize() {
 	subdivision_ = 0;
 	maxSubdivision_ = 0;
 	vertexCount_ = 0;
+
+	// Index Resourceの書き込み先とViewを無効化する
+	indexData_ = nullptr;
+	indexBufferView_ = {};
+	// SphereのIndex Resourceを解放する
+	if (indexResource_ != nullptr) {
+		indexResource_->Release();
+		indexResource_ = nullptr;
+	}
+	indexCount_ = 0;
 }

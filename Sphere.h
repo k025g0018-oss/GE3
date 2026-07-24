@@ -67,6 +67,18 @@ private:
 	// 分割数が変更されたときに頂点を作り直す
 	void GenerateVertices();
 
+	// Sphereの頂点番号を保存するIndex Resource
+	ID3D12Resource* indexResource_ = nullptr;
+
+	// Index Resourceへ書き込むためのアドレス
+	uint32_t* indexData_ = nullptr;
+
+	// 描画時にIndex Resourceの情報を渡すView
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
+
+	// 現在の分割数で描画するインデックス数
+	uint32_t indexCount_ = 0;
+
 	// Sphere専用VertexBuffer
 	VertexBuffer vertexBuffer_;
 
