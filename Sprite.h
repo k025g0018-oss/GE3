@@ -50,9 +50,18 @@ public:
 	void Finalize();
 
 private:
-	static constexpr uint32_t kVertexCount = 6;
+	// Spriteを構成する重複なしの頂点数
+	static constexpr uint32_t kVertexCount = 4;
+	// 2つの三角形を構成するインデックス数
+	static constexpr uint32_t kIndexCount = 6;
 
 	VertexBuffer vertexBuffer_;
+
+	// Spriteの頂点番号を保存するIndex Resource
+	ID3D12Resource* indexResource_ = nullptr;
+	// 描画時にIndex Resourceの情報を渡すView
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
+
 	ID3D12Resource* materialResource_ = nullptr;
 	Material* materialData_ = nullptr;
 	ID3D12Resource* wvpResource_ = nullptr;

@@ -21,24 +21,75 @@ void Sprite2D::Initialize(ID3D12Device* device, uint32_t clientWidth, uint32_t c
 	clientHeight_ = clientHeight;
 
 	/// --- VertexResourceとVertexBufferView ---
-	// 四角形を構成する6頂点分のVertexBufferを作成
+	// 重複しない4頂点分のVertexBufferを作成する
 	vertexBuffer_.Initialize(device, kVertexCount);
 	VertexData* vertexData = vertexBuffer_.GetData();
 
-	// 1つ目の三角形
-	vertexData[0] = {{0.0f, spriteHeight, 0.0f, 1.0f}, {0.0f, 1.0f}};
-	vertexData[1] = {{0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}};
-	vertexData[2] = {{spriteWidth, spriteHeight, 0.0f, 1.0f}, {1.0f, 1.0f}};
+	// 頂点0：左下
+	vertexData[0] = {
+		{0.0f, spriteHeight, 0.0f, 1.0f},
+		{0.0f, 1.0f}
+	};
 
-	// 2つ目の三角形
-	vertexData[3] = {{0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}};
-	vertexData[4] = {{spriteWidth, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}};
-	vertexData[5] = {{spriteWidth, spriteHeight, 0.0f, 1.0f}, {1.0f, 1.0f}};
+	// 頂点1：左上
+	vertexData[1] = {
+		{0.0f, 0.0f, 0.0f, 1.0f},
+		{0.0f, 0.0f}
+	};
+
+	// 頂点2：右下
+	vertexData[2] = {
+		{spriteWidth, spriteHeight, 0.0f, 1.0f},
+		{1.0f, 1.0f}
+	};
+
+	// 頂点3：右上
+	vertexData[3] = {
+		{spriteWidth, 0.0f, 0.0f, 1.0f},
+		{1.0f, 0.0f}
+	};
+
+	/// --- IndexResourceとIndexBufferView ---
+	// 2つの三角形に必要な6インデックス分のResourceを作成する
+	indexResource_ = BufferResource::Create(
+		device,
+		sizeof(uint32_t) * kIndexCount
+	);
+
+	// Index Resourceへ書き込むアドレスを取得する
+	uint32_t* indexData = nullptr;
+	HRESULT hr = indexResource_->Map(
+		0,
+		nullptr,
+		reinterpret_cast<void**>(&indexData)
+	);
+	assert(SUCCEEDED(hr));
+
+	// 1つ目の三角形：左下、左上、右下
+	indexData[0] = 0;
+	indexData[1] = 1;
+	indexData[2] = 2;
+
+	// 2つ目の三角形：左上、右上、右下
+	indexData[3] = 1;
+	indexData[4] = 3;
+	indexData[5] = 2;
+
+	// Index Resourceの先頭アドレスを設定する
+	indexBufferView_.BufferLocation =
+		indexResource_->GetGPUVirtualAddress();
+
+	// 使用するIndex Resource全体のサイズを設定する
+	indexBufferView_.SizeInBytes =
+		sizeof(uint32_t) * kIndexCount;
+
+	// Indexデータはuint32_tとして扱う
+	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
 
 	/// --- MaterialResource ---
 	// Sprite専用の色を保存するMaterialを作成
 	materialResource_ = BufferResource::Create(device, sizeof(Material));
-	HRESULT hr = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+	hr = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 	assert(SUCCEEDED(hr));
 
 	/// --- WVPResource ---
@@ -98,6 +149,9 @@ void Sprite2D::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR
 	const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer_.GetView();
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
+	// SpriteのIndexBufferViewを設定する
+	commandList->IASetIndexBuffer(&indexBufferView_);
+
 	// Sprite専用のMaterialとWVPを設定
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
@@ -105,8 +159,8 @@ void Sprite2D::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR
 	// Sprite用に選択されたTextureを設定
 	commandList->SetGraphicsRootDescriptorTable(2, textureHandle);
 
-	// 6頂点で1枚のSpriteを描画
-	commandList->DrawInstanced(kVertexCount, 1, 0, 0);
+	// 6つのインデックスを使用して2つの三角形を描画する
+	commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
 }
 
 /// --- リセット ---
@@ -145,4 +199,11 @@ void Sprite2D::Finalize() {
 
 	clientWidth_ = 0;
 	clientHeight_ = 0;
+
+	// SpriteのIndex Resourceを解放する
+	indexBufferView_ = {};
+	if (indexResource_ != nullptr) {
+		indexResource_->Release();
+		indexResource_ = nullptr;
+	}
 }
