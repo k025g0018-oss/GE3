@@ -34,6 +34,11 @@ public:
 	// ImGuiで選択されたTextureのGPUハンドルを取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandle(uint32_t textureIndex) const;
 
+	// ファイルパスに対応する読み込み済みテクスチャ番号を取得する
+	uint32_t FindTextureIndex(
+		const std::string& filePath
+	) const;
+
 	/// --- 終了処理 ---
 	// 読み込んだTextureを解放
 	void Finalize();

@@ -58,6 +58,11 @@ public:
 		return materialData_->lightingMode;
 	}
 
+	// MTLで指定されたテクスチャのファイルパスを取得する
+	const std::string& GetTextureFilePath() const {
+		return modelData_.material.textureFilePath;
+	}
+
 	// モデルのライティングが有効か取得する
 	bool IsLightingEnabled() const {
 		return materialData_->enableLighting != 0;

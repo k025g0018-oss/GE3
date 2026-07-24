@@ -100,9 +100,49 @@ ModelData ModelLoader::LoadObjFile(
 			modelData.vertices.push_back(triangle[0]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[2]);
+
+		} else if (identifier == "mtllib") {
+			// materialTemplateLibraryファイルの名前を取得する
+			std::string materialFilename;
+			lineStream >> materialFilename;
+			// 基本的にobjファイルと同一階層にmtlは存在させるので、ディレクトリ名とファイル名を渡す
+			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
 		}
 	}
 
 	// 構築したモデルデータを呼び出し元へ返す
 	return modelData;
+}
+
+///// ----- MTLファイルの読み込み ----- /////
+
+MaterialData ModelLoader::LoadMaterialTemplateFile(
+	const std::string& directoryPath,
+	const std::string& filename
+) {
+	// 1_中で必要となる変数の宣言
+	MaterialData materialData; // 構築するMaterialData
+	std::string line; // ファイルから読んだ1行を格納するもの
+
+	// 2_ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename); // ファイルを開く
+	assert(file.is_open()); // とりあえず開けなかったら止める
+
+	// 3_実際にファイルを読み、MaterialDataを構築していく
+	while (std::getline(file, line)) {
+		std::string identifier;
+		std::istringstream s(line);
+		s >> identifier;
+
+		// identifierに応じた処理
+		if (identifier == "map_Kd") {
+			std::string textureFilename;
+			s >> textureFilename;
+			// 連結してファイルパスにする
+			materialData.textureFilePath = directoryPath + "/" + textureFilename;
+		}
+	}
+
+	// 4_MaterialDataを返す
+	return materialData;
 }

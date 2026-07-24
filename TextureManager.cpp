@@ -67,6 +67,26 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandle(uint32_t textureIndex) 
 	return shaderResourceView_.GetGPUHandle(textureIndex);
 }
 
+uint32_t TextureManager::FindTextureIndex(
+	const std::string& filePath
+) const {
+	// MTLで指定されたパスと読み込み済みテクスチャを対応させる
+	if (filePath == "resources/uvChecker.png") {
+		return 1;
+	}
+
+	if (filePath == "resources/genbaneko.png") {
+		return 2;
+	}
+
+	if (filePath == "resources/monsterBall.png") {
+		return 3;
+	}
+
+	// 対応する画像がない場合は白テクスチャを使う
+	return 0;
+}
+
 /// --- Textureの読み込み ---
 // Textureデータを読むための関数
 DirectX::ScratchImage TextureManager::LoadTexture(const std::string& filePath) {

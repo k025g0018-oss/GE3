@@ -1203,8 +1203,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 平面モデルの表示を切り替える
 	bool isPlaneVisible = true;
 
-	// 平面モデルで使用するテクスチャ番号
-	int planeTextureMode = 1;
+	// MTLで指定されたテクスチャに対応する番号を取得する
+	int planeTextureMode =
+		static_cast<int>(
+			textureManager.FindTextureIndex(
+			planeModel.GetTextureFilePath()
+			)
+			);
 
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
