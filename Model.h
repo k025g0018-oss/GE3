@@ -90,5 +90,8 @@ private:
 
 	// モデルの拡縮・回転・移動
 	Transform transform_{};
+
+	// 全Meshを合わせた頂点数
+	uint32_t vertexCount_ = 0;
 };
 

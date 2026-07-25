@@ -26,18 +26,28 @@ void Model::Initialize(
 			filename
 		);
 
-	// OBJから頂点が読み込めていることを確認する
-	assert(!modelData_.vertices.empty());
+	// OBJから1つ以上のMeshが読み込めたことを確認する
+	assert(!modelData_.meshes.empty());
 
 	/// --- 頂点バッファ ---
 
 	// OBJモデルの頂点数に合わせて頂点バッファを作る
-	const uint32_t vertexCount =
-		static_cast<uint32_t>(modelData_.vertices.size());
+	// 全Meshを合わせた頂点数を計算する
+	vertexCount_ = 0;
+
+	for (const MeshData& mesh : modelData_.meshes) {
+		vertexCount_ +=
+			static_cast<uint32_t>(
+				mesh.vertices.size()
+				);
+	}
+
+	// 1頂点以上読み込めたことを確認する
+	assert(vertexCount_ > 0);
 
 	vertexBuffer_.Initialize(
 		device,
-		vertexCount
+		vertexCount_
 	);
 
 	// 頂点バッファへ書き込むアドレスを取得する
@@ -47,11 +57,25 @@ void Model::Initialize(
 	assert(vertexData != nullptr);
 
 	// OBJから読み込んだ頂点を頂点バッファへコピーする
-	std::memcpy(
-		vertexData,
-		modelData_.vertices.data(),
-		sizeof(VertexData) * modelData_.vertices.size()
-	);
+	// 頂点バッファ内の書き込み開始位置
+	uint32_t vertexOffset = 0;
+
+	// すべてのMeshを1つの頂点バッファへ順番にコピーする
+	for (const MeshData& mesh : modelData_.meshes) {
+		const uint32_t meshVertexCount =
+			static_cast<uint32_t>(
+				mesh.vertices.size()
+				);
+
+		std::memcpy(
+			vertexData + vertexOffset,
+			mesh.vertices.data(),
+			sizeof(VertexData) * meshVertexCount
+		);
+
+		// 次のMeshを書き込む位置へ進める
+		vertexOffset += meshVertexCount;
+	}
 
 	/// --- Transform ---
 	// モデルの拡縮・回転・移動を初期化する
@@ -193,8 +217,8 @@ void Model::Draw(
 	/// --- 描画 ---
 
 	// OBJから読み込んだ頂点数を使って描画する
-	commandList->DrawInstanced(
-		static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	// 全Meshを合わせた頂点数で描画する
+	commandList->DrawInstanced(vertexCount_, 1, 0, 0);
 }
 
 ///// ----- ImGuiなどからモデルの位置・回転・拡縮を変更する ----- /////
@@ -205,10 +229,8 @@ Transform& Model::GetTransform() {
 
 ///// ----- 読み込んだモデルの頂点数を取得する ----- /////
 uint32_t Model::GetVertexCount() const {
-	// OBJから読み込んだ頂点数を返す
-	return static_cast<uint32_t>(
-		modelData_.vertices.size()
-		);
+	// 全Meshを合わせた頂点数を返す
+	return vertexCount_;
 }
 
 ///// ----- 解放処理 ----- /////
@@ -232,6 +254,9 @@ void Model::Finalize() {
 		wvpResource_ = nullptr;
 	}
 
-	// CPU側に保持している頂点データを解放する
-	modelData_.vertices.clear();
+	// CPU側に保持しているMeshデータを解放する
+	modelData_.meshes.clear();
+
+	// 頂点数を初期状態へ戻す
+	vertexCount_ = 0;
 }

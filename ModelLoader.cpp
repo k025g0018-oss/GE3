@@ -9,6 +9,8 @@ ModelData ModelLoader::LoadObjFile(
 	const std::string& directoryPath,
 	const std::string& filename
 ) {
+	// objを読み込む時現在処理しているMeshを記録する
+	MeshData* currentMesh = nullptr;
 	// 読み込んだ頂点情報を格納するモデルデータ
 	ModelData modelData;
 
@@ -33,8 +35,18 @@ ModelData ModelLoader::LoadObjFile(
 		lineStream >> identifier; // 先頭の識別子を読む
 
 		// identifierに応じた処理
+		if (identifier == "o") {
+			MeshData mesh;
 
-		if (identifier == "v") {
+			// oの後ろにあるMesh名を読み込む
+			lineStream >> mesh.name;
+
+			modelData.meshes.push_back(mesh);
+
+			// これ以降の面を追加するMeshを更新する
+			currentMesh = &modelData.meshes.back();
+
+		} else if (identifier == "v") {
 			// 頂点位置を読み込む
 			Vector4 position;
 			lineStream >> position.x >> position.y >> position.z;
@@ -62,6 +74,12 @@ ModelData ModelLoader::LoadObjFile(
 			normals.push_back(normal);
 
 		} else if (identifier == "f") {
+			// oがないOBJでは、名前なしのMeshを自動的に作る
+			if (currentMesh == nullptr) {
+				modelData.meshes.push_back({});
+				currentMesh = &modelData.meshes.back();
+			}
+
 			/// --- 三角形を作る ---
 			VertexData triangle[3];
 
@@ -89,17 +107,11 @@ ModelData ModelLoader::LoadObjFile(
 				triangle[faceVertex] = {position, texcoord, normal};
 			}
 
+			// 現在のMeshへ三角形を追加する
 			// 頂点を逆順で登録することで、回り順を逆にする
-			modelData.vertices.push_back(triangle[2]);
-			modelData.vertices.push_back(triangle[1]);
-			modelData.vertices.push_back(triangle[0]);
-
-			/*
-			// 現在のプロジェクトでは、RasterizerState.cppで裏面カリングが有効 なので0,1,2で初期状態で表面になる
-			modelData.vertices.push_back(triangle[0]);
-			modelData.vertices.push_back(triangle[1]);
-			modelData.vertices.push_back(triangle[2]);
-			*/
+			currentMesh->vertices.push_back(triangle[2]);
+			currentMesh->vertices.push_back(triangle[1]);
+			currentMesh->vertices.push_back(triangle[0]);
 
 		} else if (identifier == "mtllib") {
 			// materialTemplateLibraryファイルの名前を取得する
@@ -135,7 +147,25 @@ MaterialData ModelLoader::LoadMaterialTemplateFile(
 		s >> identifier;
 
 		// identifierに応じた処理
-		if (identifier == "map_Kd") {
+		if (identifier == "newmtl") {
+			// マテリアル名を読み込む
+			s >> materialData.name;
+
+		} else if (identifier == "Ka") {
+			// 環境光色を読み込む
+			s >>
+				materialData.ambientColor.x >>
+				materialData.ambientColor.y >>
+				materialData.ambientColor.z;
+
+		} else if (identifier == "Kd") {
+			// 拡散反射色を読み込む
+			s >>
+				materialData.diffuseColor.x >>
+				materialData.diffuseColor.y >>
+				materialData.diffuseColor.z;
+
+		} else if (identifier == "map_Kd") {
 			std::string textureFilename;
 			s >> textureFilename;
 			// 連結してファイルパスにする

@@ -1236,6 +1236,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			)
 			);
 
+	///// ----- Multi Mesh OBJ Model ----- /////
+
+	Model multiMeshModel;
+
+	// 複数Meshが含まれているOBJファイルを読み込む
+	multiMeshModel.Initialize(
+		device,
+		"resources",
+		"multiMesh.obj"
+	);
+
+	// ちょいずらす
+	multiMeshModel.GetTransform().translate.x = 3.0f;
+
+	// MultiMeshモデルの表示を切り替える
+	bool isMultiMeshVisible = true;
+
+	// MTLで指定されたテクスチャ番号を取得する
+	int multiMeshTextureMode =
+		static_cast<int>(
+			textureManager.FindTextureIndex(
+			multiMeshModel.GetTextureFilePath()
+			)
+			);
+
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 	// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1299,6 +1324,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	io.Fonts->Build();
 
+	/// --- ヒエラルキーだお ---
+
 	// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
 	Primitive3DEditorObject primitive3DEditor(primitive3D, textureMode, particleSystem);
 	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode, isSpriteVisible);
@@ -1324,15 +1351,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		isAxisVisible
 	);
 
+	// MultiMeshモデルをHierarchyとPropertiesへ接続する
+	ModelEditorObject multiMeshModelEditor(
+		multiMeshModel,
+		"Multi Mesh Model",
+		multiMeshTextureMode,
+		isMultiMeshVisible
+	);
+
+	/// --- hierarchyの項目 ---
+
 	std::vector<IEditorObject*> editorObjects = {
 		// Primitive3Dの直後に、関連するSceneのモード設定を並べる
 		&primitive3DEditor,
 		&sceneSettingsEditor,
 		&particleEditor,
+
 		// 独立した描画オブジェクトはHierarchyの後ろへ並べる
+		// 3D
 		&sphereEditor,
 		&planeModelEditor,
 		&axisModelEditor,
+		&multiMeshModelEditor,
+
+		// 2D
 		&sprite2DEditor
 	};
 	IEditorObject* selectedObject = nullptr;
@@ -1735,6 +1777,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				projectionMatrix
 			);
 
+			// MultiMeshモデル専用のWVPを更新する
+			multiMeshModel.Update(
+				viewMatrix,
+				projectionMatrix
+			);
+
 			// Object3D用WVPを計算する
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
@@ -2098,6 +2146,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				);
 			}
 
+			/// --- MultiMeshモデル描画 ---
+			if (isMultiMeshVisible) {
+				// MultiMeshモデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE multiMeshTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						multiMeshTextureMode
+					)
+					);
+
+				// 複数Meshを含むモデルを描画する
+				multiMeshModel.Draw(
+					commandList,
+					multiMeshTextureHandle
+				);
+			}
+
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
 			if (isSpriteVisible) {
@@ -2157,6 +2222,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	sphere.Finalize(); // 球
 	planeModel.Finalize(); // OBJ平面のリソースを解放する
 	axisModel.Finalize(); // Axisモデルのリソースを解放する
+	multiMeshModel.Finalize(); // 複数Meshモデルのリソースを解放する
 	sprite2D.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();
