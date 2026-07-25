@@ -147,8 +147,20 @@ void Model::Initialize(
 		modelData_.materials.size()
 	);
 
-	for (ModelMaterialRuntimeData& runtimeData :
-		materialRuntimeData_) {
+	for (uint32_t materialIndex = 0;
+		materialIndex < materialRuntimeData_.size();
+		++materialIndex) {
+		ModelMaterialRuntimeData& runtimeData =
+			materialRuntimeData_[materialIndex];
+
+		const MaterialData& loadedMaterial =
+			modelData_.materials[materialIndex];
+
+		// MTLのmap_Kdから読み込んだUV Transformを初期値にする
+		runtimeData.uvTransform.translate =
+			loadedMaterial.uvTranslate;
+		runtimeData.uvTransform.scale =
+			loadedMaterial.uvScale;
 
 		// Materialごとに専用の定数バッファを作る
 		runtimeData.resource =

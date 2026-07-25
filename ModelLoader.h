@@ -20,6 +20,16 @@ struct MaterialData {
 
 	// map_Kdで指定されたテクスチャ
 	std::string textureFilePath;
+
+	// map_Kdの-oで指定されたUVの移動
+	Vector3 uvTranslate{
+		0.0f, 0.0f, 0.0f
+	};
+
+	// map_Kdの-sで指定されたUVの拡大縮小
+	Vector3 uvScale{
+		1.0f, 1.0f, 1.0f
+	};
 };
 
 /// --- 読み込んだモデルデータ ---

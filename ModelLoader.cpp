@@ -191,7 +191,29 @@ std::vector<MaterialData> ModelLoader::LoadMaterialTemplateFile(
 
 		} else if (identifier == "map_Kd" && currentMaterial != nullptr) {
 			std::string textureFilename;
-			s >> textureFilename;
+
+			// map_Kdに含まれるオプションとファイル名を順番に読む
+			std::string mapKdToken;
+			while (s >> mapKdToken) {
+				if (mapKdToken == "-o") {
+					// UVの移動を読み込む
+					s >>
+						currentMaterial->uvTranslate.x >>
+						currentMaterial->uvTranslate.y >>
+						currentMaterial->uvTranslate.z;
+
+				} else if (mapKdToken == "-s") {
+					// UVの拡大縮小を読み込む
+					s >>
+						currentMaterial->uvScale.x >>
+						currentMaterial->uvScale.y >>
+						currentMaterial->uvScale.z;
+
+				} else {
+					// オプション以外をTextureファイル名として扱う
+					textureFilename = mapKdToken;
+				}
+			}
 
 			// 現在のMaterialへテクスチャパスを設定する
 			currentMaterial->textureFilePath = directoryPath + "/" + textureFilename;
