@@ -1189,7 +1189,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Sphereの描画を個別に切り替える
 	bool isSphereVisible = true;
 
-	///// ----- OBJ Model ----- /////
+	///// ----- Plane OBJ Model ----- /////
 
 	Model planeModel;
 
@@ -1200,6 +1200,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		"plane.obj"
 	);
 
+	// 片面モデルの表側が初期状態でカメラを向くようにする
+	planeModel.GetTransform().rotate.y = 3.141592f;
+
 	// 平面モデルの表示を切り替える
 	bool isPlaneVisible = true;
 
@@ -1208,6 +1211,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		static_cast<int>(
 			textureManager.FindTextureIndex(
 			planeModel.GetTextureFilePath()
+			)
+			);
+
+	///// ----- Axis OBJ Model ----- /////
+
+	Model axisModel;
+
+	// resourcesフォルダのaxis.objを読み込む
+	axisModel.Initialize(
+		device,
+		"resources",
+		"axis.obj"
+	);
+
+	// Axisモデルの表示を切り替える
+	bool isAxisVisible = true;
+
+	// axis.mtlで指定されたテクスチャ番号を取得する
+	int axisTextureMode =
+		static_cast<int>(
+			textureManager.FindTextureIndex(
+			axisModel.GetTextureFilePath()
 			)
 			);
 
@@ -1279,8 +1304,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode, isSpriteVisible);
 	ParticleEditorObject particleEditor(particleSystem);
 	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
+
 	// SphereとSphere専用Texture番号をEditorへ接続する
 	SphereEditorObject sphereEditor(sphere, sphereTextureMode, isSphereVisible);
+
 	// OBJ平面と平面専用の表示設定をEditorへ接続する
 	ModelEditorObject planeModelEditor(
 		planeModel,
@@ -1288,6 +1315,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		planeTextureMode,
 		isPlaneVisible
 	);
+
+	// AxisモデルとAxis専用の表示設定をEditorへ接続する
+	ModelEditorObject axisModelEditor(
+		axisModel,
+		"Axis Model",
+		axisTextureMode,
+		isAxisVisible
+	);
+
 	std::vector<IEditorObject*> editorObjects = {
 		// Primitive3Dの直後に、関連するSceneのモード設定を並べる
 		&primitive3DEditor,
@@ -1296,6 +1332,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 独立した描画オブジェクトはHierarchyの後ろへ並べる
 		&sphereEditor,
 		&planeModelEditor,
+		&axisModelEditor,
 		&sprite2DEditor
 	};
 	IEditorObject* selectedObject = nullptr;
@@ -1692,6 +1729,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				projectionMatrix
 			);
 
+			// Axisモデル専用のWVPを更新する
+			axisModel.Update(
+				viewMatrix,
+				projectionMatrix
+			);
+
 			// Object3D用WVPを計算する
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
@@ -2040,6 +2083,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				);
 			}
 
+			/// --- Axisモデル描画 ---
+			if (isAxisVisible) {
+				// Axisモデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE axisTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(axisTextureMode)
+					);
+
+				// OBJから読み込んだAxisモデルを描画する
+				axisModel.Draw(
+					commandList,
+					axisTextureHandle
+				);
+			}
+
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
 			if (isSpriteVisible) {
@@ -2096,10 +2154,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
 	vertexBuffer.Finalize();
 	primitive3D.Finalize();
-	// 球
-	sphere.Finalize();
-	// OBJ平面のリソースを解放する
-	planeModel.Finalize();
+	sphere.Finalize(); // 球
+	planeModel.Finalize(); // OBJ平面のリソースを解放する
+	axisModel.Finalize(); // Axisモデルのリソースを解放する
 	sprite2D.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();

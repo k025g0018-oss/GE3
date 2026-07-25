@@ -48,7 +48,7 @@ ModelData ModelLoader::LoadObjFile(
 			Vector2 texcoord;
 			lineStream >> texcoord.x >> texcoord.y;
 			// モデルのX反転に合わせてUVも左右反転する
-			texcoord.x = 1.0f - texcoord.x;
+			// texcoord.x = 1.0f - texcoord.x;
 			// UVの原点を左下から左上へ変換する
 			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);
@@ -90,16 +90,16 @@ ModelData ModelLoader::LoadObjFile(
 			}
 
 			// 頂点を逆順で登録することで、回り順を逆にする
-			/*
 			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
-			*/
 
+			/*
 			// 現在のプロジェクトでは、RasterizerState.cppで裏面カリングが有効 なので0,1,2で初期状態で表面になる
 			modelData.vertices.push_back(triangle[0]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[2]);
+			*/
 
 		} else if (identifier == "mtllib") {
 			// materialTemplateLibraryファイルの名前を取得する
