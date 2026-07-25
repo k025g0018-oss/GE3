@@ -115,6 +115,11 @@ public:
 		return materialData_->enableLighting != 0;
 	}
 
+	// ImGuiからモデルの色を変更する
+	Vector4& GetColor() {
+		return materialData_->color;
+	}
+
 	// モデルのライティングを切り替える
 	void SetLightingEnabled(bool enabled) {
 		materialData_->enableLighting = enabled ? 1 : 0;

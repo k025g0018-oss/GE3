@@ -15,12 +15,21 @@ const char* kTextureModes[] = {
 }
 
 Primitive3DEditorObject::Primitive3DEditorObject(
-	Primitive3D& object, int& textureMode, ParticleSystem& particleSystem)
-	: object_(object), textureMode_(textureMode), particleSystem_(particleSystem) {}
+	Primitive3D& object,
+	int& textureMode,
+	ParticleSystem& particleSystem,
+	bool& isVisible)
+	: object_(object),
+	textureMode_(textureMode),
+	particleSystem_(particleSystem),
+	isVisible_(isVisible) {
+}
 
 void Primitive3DEditorObject::DrawProperties() {
 	// Primitive3Dが所有するMaterialとTextureを編集する
 	ImGui::TextUnformatted("Primitive3D Material");
+	// Primitive3Dの描画を個別に切り替える
+	ImGui::Checkbox("Draw Primitive3D", &isVisible_);
 	ImGui::ColorEdit4("Material Color", &object_.GetColor().x);
 	ImGui::Combo("Texture Mode", &textureMode_, kTextureModes, IM_ARRAYSIZE(kTextureModes));
 
@@ -118,12 +127,18 @@ void Sprite2DEditorObject::DrawProperties() {
 	);
 }
 
-ParticleEditorObject::ParticleEditorObject(ParticleSystem& particleSystem)
-	: particleSystem_(particleSystem) {}
+ParticleEditorObject::ParticleEditorObject(
+	ParticleSystem& particleSystem,
+	bool& isVisible)
+	: particleSystem_(particleSystem),
+	isVisible_(isVisible) {
+}
 
 void ParticleEditorObject::DrawProperties() {
 	// ParticleSystemの現在の状態を表示し、必要な場合は初期化する
 	ImGui::TextUnformatted("ParticleSystem");
+	// Particleの描画を個別に切り替える
+	ImGui::Checkbox("Draw Particle", &isVisible_);
 	ImGui::Separator();
 	ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem_.GetParticleCount()));
 	ImGui::Text("Max Particle Count : %d", static_cast<int>(particleSystem_.GetMaxParticleCount()));
@@ -189,6 +204,12 @@ void SphereEditorObject::DrawProperties() {
 	ImGui::TextUnformatted("Sphere Control");
 	// Sphereの描画だけを個別にON/OFFする
 	ImGui::Checkbox("Draw Sphere", &isVisible_);
+
+	// Sphereの色を個別に変更する
+	ImGui::ColorEdit4(
+		"Sphere Material Color",
+		&sphere_.GetColor().x
+	);
 
 	// Sphereのライティングを個別に切り替える
 	bool enableLighting =
@@ -266,6 +287,12 @@ void ModelEditorObject::DrawProperties() {
 
 	// OBJモデルの描画だけを個別にON/OFFする
 	ImGui::Checkbox("Draw Model", &isVisible_);
+
+	// OBJモデルの色を個別に変更する
+	ImGui::ColorEdit4(
+		"Model Material Color",
+		&model_.GetColor().x
+	);
 
 	// モデルのライティングを個別にON/OFFする
 	bool enableLighting =

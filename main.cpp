@@ -438,7 +438,15 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& prim
 // 描画統計を表示する
 void DrawStatistics(
 	const ParticleSystem& particleSystem,
-	Camera& camera
+	Camera& camera,
+	bool& isPrimitive3DVisible,
+	bool& isParticleVisible,
+	bool& isSphereVisible,
+	bool& isPlaneVisible,
+	bool& isAxisVisible,
+	bool& isMultiMeshVisible,
+	bool& isMultiMaterialVisible,
+	bool& isSpriteVisible
 ) {
 	ImGui::Begin("Statistics");
 
@@ -460,6 +468,34 @@ void DrawStatistics(
 		particleSystem.GetTotalVertexCount()
 	)
 	);
+
+	ImGui::Separator();
+
+	// すべての個別Drawを有効にする
+	if (ImGui::Button("Show All Objects")) {
+		isPrimitive3DVisible = true;
+		isParticleVisible = true;
+		isSphereVisible = true;
+		isPlaneVisible = true;
+		isAxisVisible = true;
+		isMultiMeshVisible = true;
+		isMultiMaterialVisible = true;
+		isSpriteVisible = true;
+	}
+
+	ImGui::SameLine();
+
+	// すべての個別Drawを無効にする
+	if (ImGui::Button("Hide All Objects")) {
+		isPrimitive3DVisible = false;
+		isParticleVisible = false;
+		isSphereVisible = false;
+		isPlaneVisible = false;
+		isAxisVisible = false;
+		isMultiMeshVisible = false;
+		isMultiMaterialVisible = false;
+		isSpriteVisible = false;
+	}
 
 	ImGui::Separator();
 
@@ -996,6 +1032,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Spriteの描画を個別に切り替える
 	bool isSpriteVisible = true;
 
+	// Primitive3Dの描画を個別に切り替える
+	bool isPrimitive3DVisible = true;
+
+	// Particleの描画を個別に切り替える
+	bool isParticleVisible = true;
+
+	// ライティング全体の有効状態を保持する
+	bool isAllLightingEnabled = true;
+
+	// ライティング全体へ適用する方式を保持する
+	int allLightingMode = 0;
+
 	/// --- Material用のリソースを作る ---
 	ID3D12Resource* materialResource = BufferResource::Create(device, sizeof(Material));
 	// マテリアルにデータを書き込む
@@ -1353,9 +1401,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- ヒエラルキーだお ---
 
 	// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
-	Primitive3DEditorObject primitive3DEditor(primitive3D, textureMode, particleSystem);
+	Primitive3DEditorObject primitive3DEditor(
+		primitive3D,
+		textureMode,
+		particleSystem,
+		isPrimitive3DVisible
+	);
 	Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode, isSpriteVisible);
-	ParticleEditorObject particleEditor(particleSystem);
+	ParticleEditorObject particleEditor(
+		particleSystem,
+		isParticleVisible
+	);
 	SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
 
 	// SphereとSphere専用Texture番号をEditorへ接続する
@@ -1489,6 +1545,77 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::Begin("Directional Light");
 
+			// ライティングを使用する全オブジェクトへまとめて反映する
+			if (ImGui::Checkbox(
+				"Enable All Lighting",
+				&isAllLightingEnabled
+			)) {
+				primitive3D.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+				sphere.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+				planeModel.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+				axisModel.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+				multiMeshModel.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+				multiMaterialModel.SetLightingEnabled(
+					isAllLightingEnabled
+				);
+
+				// ONにしたときは選択中の方式も全体へ適用する
+				if (isAllLightingEnabled) {
+					primitive3D.GetLightingMode() =
+						allLightingMode;
+					sphere.GetLightingMode() =
+						allLightingMode;
+					planeModel.GetLightingMode() =
+						allLightingMode;
+					axisModel.GetLightingMode() =
+						allLightingMode;
+					multiMeshModel.GetLightingMode() =
+						allLightingMode;
+					multiMaterialModel.GetLightingMode() =
+						allLightingMode;
+				}
+			}
+
+			if (isAllLightingEnabled) {
+				const char* allLightingModes[] = {
+					"Lambert",
+					"Half Lambert"
+				};
+
+				// 全オブジェクトへ同じライティング方式を適用する
+				if (ImGui::Combo(
+					"All Lighting Mode",
+					&allLightingMode,
+					allLightingModes,
+					IM_ARRAYSIZE(allLightingModes)
+				)) {
+					primitive3D.GetLightingMode() =
+						allLightingMode;
+					sphere.GetLightingMode() =
+						allLightingMode;
+					planeModel.GetLightingMode() =
+						allLightingMode;
+					axisModel.GetLightingMode() =
+						allLightingMode;
+					multiMeshModel.GetLightingMode() =
+						allLightingMode;
+					multiMaterialModel.GetLightingMode() =
+						allLightingMode;
+				}
+			}
+
+			ImGui::Separator();
+
 			// 光源色を変更する
 			ImGui::ColorEdit4(
 				"Light Color",
@@ -1573,7 +1700,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			DrawContentBrowserAssets(textureManager);
-			DrawStatistics(particleSystem, camera);
+			DrawStatistics(
+				particleSystem,
+				camera,
+				isPrimitive3DVisible,
+				isParticleVisible,
+				isSphereVisible,
+				isPlaneVisible,
+				isAxisVisible,
+				isMultiMeshVisible,
+				isMultiMaterialVisible,
+				isSpriteVisible
+			);
 			DrawFlowGraph(particleSystem, primitive3D);
 
 #endif // USE_IMGUI
@@ -2132,7 +2270,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			);
 
 			// モードの描画
-			if (renderingMode == 5) {
+			if (isParticleVisible &&
+				renderingMode == 5) {
 				// Production ModeではParticleSystemを描画する
 				particleSystem.Draw(
 					commandList,
@@ -2140,7 +2279,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					projectionMatrix
 				);
 
-			} else {
+			} else if (isPrimitive3DVisible) {
 				// Noneを含む描画判定はPrimitive3D側へ集約する
 				primitive3D.Draw(commandList, currentTextureHandle);
 			}

@@ -58,6 +58,11 @@ public:
 		return materialData_->enableLighting != 0;
 	}
 
+	// ImGuiからSphereの色を変更する
+	Vector4& GetColor() {
+		return materialData_->color;
+	}
+
 	// Sphereのライティングを切り替える
 	void SetLightingEnabled(bool enabled) {
 		materialData_->enableLighting = enabled ? 1 : 0;

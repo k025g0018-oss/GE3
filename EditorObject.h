@@ -21,7 +21,12 @@ public:
 // Primitive3DをHierarchyとPropertiesへ接続するラッパークラス
 class Primitive3DEditorObject final : public IEditorObject {
 public:
-	Primitive3DEditorObject(Primitive3D& object, int& textureMode, ParticleSystem& particleSystem);
+	Primitive3DEditorObject(
+		Primitive3D& object,
+		int& textureMode,
+		ParticleSystem& particleSystem,
+		bool& isVisible
+	);
 	const char* GetName() const override { return "Primitive3D"; }
 	void DrawProperties() override;
 
@@ -31,6 +36,8 @@ private:
 	// Texture選択とParticle設定も同じProperties上で操作する
 	int& textureMode_;
 	ParticleSystem& particleSystem_;
+	// Primitive3Dを描画するかどうかをmainと共有する
+	bool& isVisible_;
 };
 
 // Sprite2DをHierarchyとPropertiesへ接続するラッパークラス
@@ -51,13 +58,18 @@ private:
 // ParticleSystemをHierarchyとPropertiesへ接続するラッパークラス
 class ParticleEditorObject final : public IEditorObject {
 public:
-	explicit ParticleEditorObject(ParticleSystem& particleSystem);
+	ParticleEditorObject(
+		ParticleSystem& particleSystem,
+		bool& isVisible
+	);
 	const char* GetName() const override { return "ParticleSystem"; }
 	void DrawProperties() override;
 
 private:
 	// Particleの生成数や速度をPropertiesから操作するため参照を保持する
 	ParticleSystem& particleSystem_;
+	// Particleを描画するかどうかをmainと共有する
+	bool& isVisible_;
 };
 
 // SphereをHierarchyとPropertiesへ接続するラッパークラス
