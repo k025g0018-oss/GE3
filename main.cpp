@@ -1261,6 +1261,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			)
 			);
 
+	///// ----- Multi Material OBJ Model ----- /////
+
+	Model multiMaterialModel;
+
+	// 複数Materialを使用するOBJファイルを読み込む
+	multiMaterialModel.Initialize(
+		device,
+		"resources",
+		"multiMaterial.obj"
+	);
+
+	// 他のモデルと重ならない位置へ移動する
+	multiMaterialModel.GetTransform().translate.x =
+		-3.0f;
+
+	// MultiMaterialモデルの表示を切り替える
+	bool isMultiMaterialVisible = true;
+
+	// Propertiesとの互換性用に先頭のTexture番号を取得する
+	int multiMaterialTextureMode =
+		static_cast<int>(
+			textureManager.FindTextureIndex(
+			multiMaterialModel.GetTextureFilePath()
+			)
+			);
+
 	///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 	// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1359,6 +1385,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		isMultiMeshVisible
 	);
 
+	// MultiMaterialモデルをHierarchyとPropertiesへ接続する
+	ModelEditorObject multiMaterialModelEditor(
+		multiMaterialModel,
+		"Multi Material Model",
+		multiMaterialTextureMode,
+		isMultiMaterialVisible
+	);
+
 	/// --- hierarchyの項目 ---
 
 	std::vector<IEditorObject*> editorObjects = {
@@ -1373,6 +1407,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		&planeModelEditor,
 		&axisModelEditor,
 		&multiMeshModelEditor,
+		&multiMaterialModelEditor,
 
 		// 2D
 		&sprite2DEditor
@@ -1783,6 +1818,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				projectionMatrix
 			);
 
+			// MultiMaterialモデル専用のWVPを更新する
+			multiMaterialModel.Update(
+				viewMatrix,
+				projectionMatrix
+			);
+
 			// Object3D用WVPを計算する
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
@@ -2163,6 +2204,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				);
 			}
 
+			/// --- MultiMaterialモデル描画 ---
+			if (isMultiMaterialVisible) {
+				// MeshごとにMTLで指定されたTextureを使って描画する
+				multiMaterialModel.DrawWithMaterials(
+					commandList,
+					textureManager
+				);
+			}
+
 			/// --- Texture ---
 			// 三角形とは別に選択されたTextureを取得する
 			if (isSpriteVisible) {
@@ -2223,6 +2273,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	planeModel.Finalize(); // OBJ平面のリソースを解放する
 	axisModel.Finalize(); // Axisモデルのリソースを解放する
 	multiMeshModel.Finalize(); // 複数Meshモデルのリソースを解放する
+	multiMaterialModel.Finalize(); // 複数Materialモデルのリソースを解放する
 	sprite2D.Finalize();
 	particleSystem.Finalize();
 	wvpResource->Release();

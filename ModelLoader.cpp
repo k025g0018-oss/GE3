@@ -117,9 +117,22 @@ ModelData ModelLoader::LoadObjFile(
 			// materialTemplateLibraryファイルの名前を取得する
 			std::string materialFilename;
 			lineStream >> materialFilename;
+
 			// 基本的にobjファイルと同一階層にmtlは存在させるので、ディレクトリ名とファイル名を渡す
-			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
+			// MTL内にあるすべてのMaterialを読み込む
+			modelData.materials = LoadMaterialTemplateFile(directoryPath, materialFilename);
+
+		} else if (identifier == "usemtl") {
+			// oがない場合は名前なしのMeshを作る
+			if (currentMesh == nullptr) {
+				modelData.meshes.push_back({});
+				currentMesh = &modelData.meshes.back();
+			}
+
+			// これ以降の面で使用するMaterial名をMeshへ保存する
+			lineStream >> currentMesh->materialName;
 		}
+
 	}
 
 	// 構築したモデルデータを呼び出し元へ返す
@@ -128,13 +141,19 @@ ModelData ModelLoader::LoadObjFile(
 
 ///// ----- MTLファイルの読み込み ----- /////
 
-MaterialData ModelLoader::LoadMaterialTemplateFile(
+std::vector<MaterialData> ModelLoader::LoadMaterialTemplateFile(
 	const std::string& directoryPath,
 	const std::string& filename
 ) {
 	// 1_中で必要となる変数の宣言
-	MaterialData materialData; // 構築するMaterialData
-	std::string line; // ファイルから読んだ1行を格納するもの
+	// MTLから読み込んだすべてのMaterial
+	std::vector<MaterialData> materials;
+
+	// 現在読み込んでいるMaterial
+	MaterialData* currentMaterial = nullptr;
+
+	// ファイルから読んだ1行を格納するもの
+	std::string line;
 
 	// 2_ファイルを開く
 	std::ifstream file(directoryPath + "/" + filename); // ファイルを開く
@@ -148,31 +167,38 @@ MaterialData ModelLoader::LoadMaterialTemplateFile(
 
 		// identifierに応じた処理
 		if (identifier == "newmtl") {
+			MaterialData material;
+
 			// マテリアル名を読み込む
-			s >> materialData.name;
+			s >> material.name;
 
-		} else if (identifier == "Ka") {
-			// 環境光色を読み込む
+			materials.push_back(material);
+			currentMaterial = &materials.back();
+
+		} else if (identifier == "Ka" && currentMaterial != nullptr) {
+			// 現在のMaterialへ環境光色を設定する
 			s >>
-				materialData.ambientColor.x >>
-				materialData.ambientColor.y >>
-				materialData.ambientColor.z;
+				currentMaterial->ambientColor.x >>
+				currentMaterial->ambientColor.y >>
+				currentMaterial->ambientColor.z;
 
-		} else if (identifier == "Kd") {
-			// 拡散反射色を読み込む
+		} else if (identifier == "Kd" && currentMaterial != nullptr) {
+			// 現在のMaterialへ拡散反射色を設定する
 			s >>
-				materialData.diffuseColor.x >>
-				materialData.diffuseColor.y >>
-				materialData.diffuseColor.z;
+				currentMaterial->diffuseColor.x >>
+				currentMaterial->diffuseColor.y >>
+				currentMaterial->diffuseColor.z;
 
-		} else if (identifier == "map_Kd") {
+		} else if (identifier == "map_Kd" && currentMaterial != nullptr) {
 			std::string textureFilename;
 			s >> textureFilename;
-			// 連結してファイルパスにする
-			materialData.textureFilePath = directoryPath + "/" + textureFilename;
+
+			// 現在のMaterialへテクスチャパスを設定する
+			currentMaterial->textureFilePath = directoryPath + "/" + textureFilename;
 		}
 	}
 
 	// 4_MaterialDataを返す
-	return materialData;
+	// 読み込んだすべてのMaterialを返す
+	return materials;
 }

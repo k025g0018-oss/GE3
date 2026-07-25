@@ -330,6 +330,55 @@ void ModelEditorObject::DrawProperties() {
 		"Vertex Count: %u",
 		model_.GetVertexCount()
 	);
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Material UV Transform");
+
+	// 読み込んだMaterialごとにUV Transformを表示する
+	for (uint32_t materialIndex = 0;
+		materialIndex < model_.GetMaterialCount();
+		++materialIndex) {
+
+		// 同じ名前のImGui項目を区別する
+		ImGui::PushID(static_cast<int>(materialIndex));
+
+		const std::string& materialName =
+			model_.GetMaterialName(materialIndex);
+
+		// Material名ごとに項目を開閉できるようにする
+		if (ImGui::TreeNode(materialName.c_str())) {
+			Transform& uvTransform =
+				model_.GetMaterialUVTransform(materialIndex);
+
+			// UVの移動を変更する
+			ImGui::DragFloat2(
+				"UV Translate",
+				&uvTransform.translate.x,
+				0.01f,
+				-10.0f,
+				10.0f
+			);
+
+			// UVの拡大縮小を変更する
+			ImGui::DragFloat2(
+				"UV Scale",
+				&uvTransform.scale.x,
+				0.01f,
+				-10.0f,
+				10.0f
+			);
+
+			// UVをZ軸で回転させる
+			ImGui::SliderAngle(
+				"UV Rotate",
+				&uvTransform.rotate.z
+			);
+
+			ImGui::TreePop();
+		}
+
+		ImGui::PopID();
+	}
 }
 
 #endif // USE_IMGUI

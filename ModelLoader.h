@@ -28,6 +28,9 @@ struct MeshData {
 	// o識別子で指定されたMesh名
 	std::string name;
 
+	// usemtl識別子で指定されたMaterial名
+	std::string materialName;
+
 	// Meshを構成する頂点
 	std::vector<VertexData> vertices;
 };
@@ -37,18 +40,19 @@ struct ModelData {
 	// OBJ内にある複数のMesh
 	std::vector<MeshData> meshes;
 
-	// MTLから読み込んだマテリアル
-	MaterialData material;
+	// MTLから読み込んだマテリアル 単一Material
+	//MaterialData material;
 
 	// MTL内にある複数のMaterial
-	//std::vector<MaterialData> materials;
+	std::vector<MaterialData> materials;
 };
 
 namespace ModelLoader {
 
 	/// --- MTLファイルの読み込み ---
 	/// 指定されたMTLファイルを読み込み、マテリアルデータを返す
-	MaterialData LoadMaterialTemplateFile(
+	// MTLファイル内のすべてのMaterialを返す
+	std::vector<MaterialData> LoadMaterialTemplateFile(
 		const std::string& directoryPath,
 		const std::string& filename
 	);

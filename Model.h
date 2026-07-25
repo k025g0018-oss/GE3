@@ -5,11 +5,29 @@
 #include "ModelLoader.h"
 #include "TransformationMatrix.h"
 #include "VertexBuffer.h"
+#include "TextureManager.h"
 
 #include <d3d12.h>
 #include <string>
+#include <vector>
 
 ///// ----- Model ----- /////
+
+// 描画時にMaterialごとの定数バッファとUV Transformを保持する
+struct ModelMaterialRuntimeData {
+	// Material専用の定数バッファ
+	ID3D12Resource* resource = nullptr;
+
+	// 定数バッファへ書き込むアドレス
+	Material* data = nullptr;
+
+	// ImGuiから操作するUVの拡縮・回転・移動
+	Transform uvTransform{
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+};
 
 // OBJモデルのリソースと描画処理を管理する
 class Model {
@@ -42,6 +60,13 @@ public:
 		D3D12_GPU_DESCRIPTOR_HANDLE textureHandle
 	) const;
 
+	/// --- 複数Material描画 ---
+	// MeshごとにMTLで指定されたTextureを使って描画する
+	void DrawWithMaterials(
+		ID3D12GraphicsCommandList* commandList,
+		const TextureManager& textureManager
+	) const;
+
 	/// --- 終了処理 ---
 	// Modelが所有しているリソースを解放する
 	void Finalize();
@@ -60,7 +85,29 @@ public:
 
 	// MTLで指定されたテクスチャのファイルパスを取得する
 	const std::string& GetTextureFilePath() const {
-		return modelData_.material.textureFilePath;
+		return modelData_.materials.front().textureFilePath;
+	}
+
+	// 読み込んだMaterialの数を取得する
+	uint32_t GetMaterialCount() const {
+		return static_cast<uint32_t>(
+			modelData_.materials.size()
+			);
+	}
+
+	// 指定したMaterialの名前を取得する
+	const std::string& GetMaterialName(
+		uint32_t materialIndex
+	) const {
+		return modelData_.materials[materialIndex].name;
+	}
+
+	// 指定したMaterialのUV Transformを取得する
+	Transform& GetMaterialUVTransform(
+		uint32_t materialIndex
+	) {
+		return materialRuntimeData_[materialIndex].
+			uvTransform;
 	}
 
 	// モデルのライティングが有効か取得する
@@ -93,5 +140,9 @@ private:
 
 	// 全Meshを合わせた頂点数
 	uint32_t vertexCount_ = 0;
+
+	// MTL内のMaterialごとに描画用リソースを保持する
+	std::vector<ModelMaterialRuntimeData>
+		materialRuntimeData_;
 };
 
