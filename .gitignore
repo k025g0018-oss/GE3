@@ -372,3 +372,6 @@ Dumps/
 imgui.ini
 
 hlsl
+
+# gitignoreでobjをアップできるようにする
+!resources/**/*.obj
