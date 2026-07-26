@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <ostream>
 
 ///// ----- RootSignature ----- /////
@@ -19,14 +20,15 @@ public:
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得
-	ID3D12RootSignature* Get() const { return rootSignature_; }
+	ID3D12RootSignature* Get() const { return rootSignature_.Get(); }
 
 	/// --- 終了処理 ---
 	// RootSignatureで使用したリソースを解放
 	void Finalize();
 
 private:
-	ID3D12RootSignature* rootSignature_ = nullptr;
-	ID3DBlob* signatureBlob_ = nullptr;
-	ID3DBlob* errorBlob_ = nullptr;
+	// RootSignature関連のCOMオブジェクトを自動解放する
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
+	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob_;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob_;
 };

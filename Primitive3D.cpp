@@ -234,14 +234,10 @@ void Primitive3D::Finalize() {
 
 	// Map先を無効にしてからMaterialリソースを解放する
 	materialData_ = nullptr;
-	if (materialResource_ != nullptr) {
-		materialResource_->Release(); materialResource_ = nullptr;
-	}
+	// MaterialResourceはComPtrのデストラクタが自動解放する
 
 	// Map先を無効にしてからWVPリソースを解放する
 	wvpData_ = nullptr;
-	if (wvpResource_ != nullptr) {
-		wvpResource_->Release(); wvpResource_ = nullptr;
-	}
+	// WVPResourceはComPtrのデストラクタが自動解放する
 	drawVertexCount_ = 0;
 }

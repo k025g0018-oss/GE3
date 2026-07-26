@@ -8,6 +8,7 @@
 #include "ShaderProgram.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <ostream>
 
 ///// ----- PSO(Pipeline State Object) ----- /////
@@ -29,7 +30,7 @@ public:
 	ID3D12RootSignature* GetRootSignature() const { return rootSignature_.Get(); }
 
 	// 作成したPSOを取得
-	ID3D12PipelineState* GetPipelineState() const { return graphicsPipelineState_; }
+	ID3D12PipelineState* GetPipelineState() const { return graphicsPipelineState_.Get(); }
 
 	/// --- 終了処理 ---
 	// PSOで使用したリソースを解放
@@ -42,5 +43,6 @@ private:
 	RasterizerState rasterizerState_;
 	DepthStencilState depthStencilState_;
 	ShaderProgram shaderProgram_;
-	ID3D12PipelineState* graphicsPipelineState_ = nullptr;
+	// PipelineStateの寿命をComPtrで管理する
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
 };

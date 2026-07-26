@@ -36,8 +36,5 @@ void VertexBuffer::Initialize(ID3D12Device* device, uint32_t maxVertexCount) {
 void VertexBuffer::Finalize() {
 	vertexData_ = nullptr;
 	vertexBufferView_ = {};
-	if (vertexResource_ != nullptr) {
-		vertexResource_->Release();
-		vertexResource_ = nullptr;
-	}
+	// VertexResourceはComPtrのデストラクタが自動解放する
 }

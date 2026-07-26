@@ -4,6 +4,7 @@
 #include <dxcapi.h>
 #include <ostream>
 #include <string>
+#include <wrl.h>
 
 ///// ----- DXC(DirectX Shader Compiler) ----- /////
 
@@ -21,7 +22,7 @@ public:
 
 	/// --- Shaderのコンパイル ---
 	// HLSLをコンパイルして実行用のバイナリを返す
-	IDxcBlob* CompileShader(
+	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 		// CompilerするShaderファイルへのパス
 		const std::wstring& filePath,
 		// Compilerに使用するProfile
@@ -35,7 +36,7 @@ public:
 
 private:
 	// 初期化で生成したものを3つ
-	IDxcUtils* dxcUtils_ = nullptr;
-	IDxcCompiler3* dxcCompiler_ = nullptr;
-	IDxcIncludeHandler* includeHandler_ = nullptr;
+	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils_;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler_;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler_;
 };

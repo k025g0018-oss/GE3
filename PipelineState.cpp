@@ -57,17 +57,17 @@ void PipelineState::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	graphicsPipelineStateDesc.SampleDesc.Count = 1;
 	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 	// 実際に生成
-	HRESULT hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState_));
+	HRESULT hr = device->CreateGraphicsPipelineState(
+		&graphicsPipelineStateDesc,
+		IID_PPV_ARGS(graphicsPipelineState_.GetAddressOf())
+	);
 	assert(SUCCEEDED(hr));
 }
 
 /// --- 終了処理 ---
 // PSO関連のリソースを解放
 void PipelineState::Finalize() {
-	if (graphicsPipelineState_ != nullptr) {
-		graphicsPipelineState_->Release();
-		graphicsPipelineState_ = nullptr;
-	}
+	// PipelineStateはComPtrのデストラクタが自動解放する
 	shaderProgram_.Finalize();
 	rootSignature_.Finalize();
 }

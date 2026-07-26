@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 
 ///// ----- DescriptorHeap ----- /////
@@ -19,7 +20,7 @@ public:
 
 	/// --- 取得 ---
 	// DescriptorHeapを取得
-	ID3D12DescriptorHeap* Get() const { return descriptorHeap_; }
+	ID3D12DescriptorHeap* Get() const { return descriptorHeap_.Get(); }
 
 	// CPU側の先頭ハンドルを取得
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandleStart() const;
@@ -44,7 +45,8 @@ public:
 	void Finalize();
 
 private:
-	ID3D12DescriptorHeap* descriptorHeap_ = nullptr;
+	// DescriptorHeapの寿命をComPtrで管理する
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
 	UINT descriptorSize_ = 0;
 	UINT descriptorCount_ = 0;
 };

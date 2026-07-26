@@ -247,9 +247,6 @@ bool ParticleSystem::ReflectAtFieldWall(Particle& particle) {
 void ParticleSystem::Finalize() {
 	particles_.clear();
 	particleWvpData_ = nullptr;
-	if (particleWvpResource_ != nullptr) {
-		particleWvpResource_->Release();
-		particleWvpResource_ = nullptr;
-	}
+	// Particle用ResourceはComPtrのデストラクタが自動解放する
 	maxParticleCount_ = 0;
 }

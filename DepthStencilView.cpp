@@ -13,9 +13,7 @@ DepthStencilView::~DepthStencilView() {
 void DepthStencilView::Initialize(ID3D12Device* device, const DescriptorHeap& dsvDescriptorHeap, int32_t width, int32_t height) {
 	// 深度ステンシルテクスチャリソースを作る
 	// 生成したResourceの所有権をResourceObjectへ渡す
-	depthStencilResource_.Reset(
-		CreateDepthStencilTextureResource(device, width, height)
-	);
+	depthStencilResource_ = CreateDepthStencilTextureResource(device, width, height);
 
 	// DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -34,7 +32,7 @@ void DepthStencilView::Initialize(ID3D12Device* device, const DescriptorHeap& ds
 
 /// --- DepthStencilTexture ---
 // DepthStencilTexture
-ID3D12Resource* DepthStencilView::CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height) {
+Microsoft::WRL::ComPtr<ID3D12Resource> DepthStencilView::CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height) {
 	// 生成するResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = width; // Textureの幅
@@ -56,14 +54,14 @@ ID3D12Resource* DepthStencilView::CreateDepthStencilTextureResource(ID3D12Device
 	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; // フォーマット。Resourceに合わせる
 
 	// Resourceの生成
-	ID3D12Resource* resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource;
 	HRESULT hr = device->CreateCommittedResource(
 		&heapProperties, // Heapの設定
 		D3D12_HEAP_FLAG_NONE, // Heapの特殊な設定。特になし
 		&resourceDesc, // Resourceの設定
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, // 深度値を書き込む状態にしておく
 		&depthClearValue, // Clear最適値
-		IID_PPV_ARGS(&resource)
+		IID_PPV_ARGS(resource.GetAddressOf())
 	);
 	assert(SUCCEEDED(hr));
 
@@ -77,5 +75,5 @@ void DepthStencilView::Finalize() {
 	
 	// Deviceを解放する前にDepthStencilResourceを解放する
 	// デストラクタから再度Resetされてもnullptrなので二重解放されない
-	depthStencilResource_.Reset();
+	// DepthStencilResourceはComPtrのデストラクタが自動解放する
 }

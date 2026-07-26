@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <d3d12.h>
+#include <wrl.h>
 
 ///// ----- SceneRenderTexture ----- /////
 
@@ -44,8 +45,8 @@ private:
 		D3D12_RESOURCE_STATES nextState
 	);
 
-	ID3D12Resource* resource_ = nullptr;
-	ID3D12DescriptorHeap* rtvDescriptorHeap_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap_;
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_{};
 	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
 	D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

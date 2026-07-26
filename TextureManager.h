@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <wrl.h>
 
 ///// ----- TextureManager ----- /////
 
@@ -50,14 +51,14 @@ private:
 
 	/// --- TextureResource ---
 	// TextureResourceを作成
-	ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata);
 
 	/// --- Textureの転送 ---
 	// TextureResourceにデータを転送
-	ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
 	std::array<DirectX::ScratchImage, kTextureCount> textureMipImages_;
-	std::array<ID3D12Resource*, kTextureCount> textureResources_{};
-	std::array<ID3D12Resource*, kTextureCount> intermediateResources_{};
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kTextureCount> textureResources_{};
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kTextureCount> intermediateResources_{};
 	ShaderResourceView shaderResourceView_;
 };

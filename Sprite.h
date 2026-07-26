@@ -6,6 +6,7 @@
 #include "TransformationMatrix.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 
 ///// ----- Sprite ----- /////
@@ -69,13 +70,13 @@ private:
 	VertexBuffer vertexBuffer_;
 
 	// Spriteの頂点番号を保存するIndex Resource
-	ID3D12Resource* indexResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_;
 	// 描画時にIndex Resourceの情報を渡すView
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
-	ID3D12Resource* materialResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Material* materialData_ = nullptr;
-	ID3D12Resource* wvpResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	// WVPとWorldをシェーダーへ送る
 	TransformationMatrix* wvpData_ = nullptr;
 	Transform transform_{};

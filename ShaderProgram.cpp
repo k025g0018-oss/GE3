@@ -36,13 +36,6 @@ D3D12_SHADER_BYTECODE ShaderProgram::GetPixelShaderByteCode() const {
 /// --- 終了処理 ---
 // Shaderで使用したリソースを解放
 void ShaderProgram::Finalize() {
-	if (vertexShaderBlob_ != nullptr) {
-		vertexShaderBlob_->Release();
-		vertexShaderBlob_ = nullptr;
-	}
-	if (pixelShaderBlob_ != nullptr) {
-		pixelShaderBlob_->Release();
-		pixelShaderBlob_ = nullptr;
-	}
+	// ShaderBlobはComPtrのデストラクタが自動解放する
 	dxcCompiler_.Finalize();
 }

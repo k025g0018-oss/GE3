@@ -64,7 +64,12 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 
 	/// --- Serialize ---
 	// シリアライズしてバイナリにする
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob_, &errorBlob_);
+	HRESULT hr = D3D12SerializeRootSignature(
+		&descriptionRootSignature,
+		D3D_ROOT_SIGNATURE_VERSION_1,
+		signatureBlob_.GetAddressOf(),
+		errorBlob_.GetAddressOf()
+	);
 	if (FAILED(hr)) {
 		if (errorBlob_ != nullptr) {
 			Log(logStream, reinterpret_cast<char*>(errorBlob_->GetBufferPointer()));
@@ -73,23 +78,17 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	}
 
 	// バイナリを元に生成
-	hr = device->CreateRootSignature(0, signatureBlob_->GetBufferPointer(), signatureBlob_->GetBufferSize(), IID_PPV_ARGS(&rootSignature_));
+	hr = device->CreateRootSignature(
+		0,
+		signatureBlob_->GetBufferPointer(),
+		signatureBlob_->GetBufferSize(),
+		IID_PPV_ARGS(rootSignature_.GetAddressOf())
+	);
 	assert(SUCCEEDED(hr));
 }
 
 /// --- 終了処理 ---
 // RootSignature関連のリソースを解放
 void RootSignature::Finalize() {
-	if (rootSignature_ != nullptr) {
-		rootSignature_->Release();
-		rootSignature_ = nullptr;
-	}
-	if (signatureBlob_ != nullptr) {
-		signatureBlob_->Release();
-		signatureBlob_ = nullptr;
-	}
-	if (errorBlob_ != nullptr) {
-		errorBlob_->Release();
-		errorBlob_ = nullptr;
-	}
+	// RootSignature関連はComPtrのデストラクタが自動解放する
 }

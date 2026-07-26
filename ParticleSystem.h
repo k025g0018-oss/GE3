@@ -5,6 +5,7 @@
 #include "TransformationMatrix.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 #include <random>
 #include <vector>
@@ -99,6 +100,7 @@ private:
 	uint32_t maxParticleCount_ = 0;
 	DebugFlowState debugFlowState_{};
 
-	ID3D12Resource* particleWvpResource_ = nullptr;
+	// Particle用ResourceをComPtrで自動解放する
+	Microsoft::WRL::ComPtr<ID3D12Resource> particleWvpResource_;
 	uint8_t* particleWvpData_ = nullptr;
 };

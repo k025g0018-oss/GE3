@@ -37,14 +37,14 @@ void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList*
 		textureResources_[i] = CreateTextureResource(device, metadata);
 
 		intermediateResources_[i] = UploadTextureData(
-			textureResources_[i],
+			textureResources_[i].Get(),
 			textureMipImages_[i],
 			device,
 			commandList
 		);
 
 		// TextureごとのSRVを作成する
-		shaderResourceView_.CreateTextureSRV(device, i, textureResources_[i], metadata);
+		shaderResourceView_.CreateTextureSRV(device, i, textureResources_[i].Get(), metadata);
 	}
 }
 
@@ -52,11 +52,9 @@ void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList*
 // GPU転送用のResourceを解放
 void TextureManager::ReleaseIntermediateResources() {
 	// 転送が終わったのでソースは解放する
-	for (ID3D12Resource*& intermediateResource : intermediateResources_) {
-		if (intermediateResource != nullptr) {
-			intermediateResource->Release();
-			intermediateResource = nullptr;
-		}
+	for (Microsoft::WRL::ComPtr<ID3D12Resource>& intermediateResource : intermediateResources_) {
+		// GPU転送完了後に中間Resourceの所有権を解放する
+		intermediateResource.Reset();
 	}
 }
 
@@ -114,7 +112,7 @@ DirectX::ScratchImage TextureManager::LoadTexture(const std::string& filePath) {
 
 /// --- TextureResource ---
 // TextureResourceを作る
-ID3D12Resource* TextureManager::CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata) {
+Microsoft::WRL::ComPtr<ID3D12Resource> TextureManager::CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata) {
 	// 1_metadataを基にResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = UINT(metadata.width); // Textureの幅
@@ -130,14 +128,14 @@ ID3D12Resource* TextureManager::CreateTextureResource(ID3D12Device* device, cons
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // 細かい設定を行う
 
 	// 3_Resourceを生成する
-	ID3D12Resource* resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource;
 	HRESULT hr = device->CreateCommittedResource(
 		&heapProperties, // Heapの設定
 		D3D12_HEAP_FLAG_NONE, // Heapの特殊な設定。特になし
 		&resourceDesc, // Resourceの設定
 		D3D12_RESOURCE_STATE_COPY_DEST, // 初回のResourceState
 		nullptr, // Clear最適値。使わない
-		IID_PPV_ARGS(&resource)
+		IID_PPV_ARGS(resource.GetAddressOf())
 	);
 	assert(SUCCEEDED(hr));
 
@@ -146,17 +144,18 @@ ID3D12Resource* TextureManager::CreateTextureResource(ID3D12Device* device, cons
 
 /// --- Textureの転送 ---
 // TextureResourceにデータを転送する
-ID3D12Resource* TextureManager::UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) {
+Microsoft::WRL::ComPtr<ID3D12Resource> TextureManager::UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) {
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 	DirectX::PrepareUpload(device, mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
 
 	uint64_t intermediateSize = GetRequiredIntermediateSize(texture, 0, UINT(subresources.size()));
 
 	// 中間用のバッファ(UPLOAD)を作成
-	ID3D12Resource* intermediateResource = BufferResource::Create(device, intermediateSize);
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource =
+		BufferResource::Create(device, intermediateSize);
 
 	// データ転送コマンドを積む
-	UpdateSubresources(commandList, texture, intermediateResource, 0, 0, UINT(subresources.size()), subresources.data());
+	UpdateSubresources(commandList, texture, intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
 
 	// Textureへの転送後、利用できるようにCOPY_DESTからGENERIC_READへResourceStateを変更する
 	D3D12_RESOURCE_BARRIER barrier{};
@@ -176,10 +175,5 @@ ID3D12Resource* TextureManager::UploadTextureData(ID3D12Resource* texture, const
 // 読み込んだTextureを解放
 void TextureManager::Finalize() {
 	ReleaseIntermediateResources();
-	for (ID3D12Resource*& textureResource : textureResources_) {
-		if (textureResource != nullptr) {
-			textureResource->Release();
-			textureResource = nullptr;
-		}
-	}
+	// TextureResourceはComPtrのデストラクタが自動解放する
 }

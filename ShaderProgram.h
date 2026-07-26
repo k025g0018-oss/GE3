@@ -4,6 +4,7 @@
 
 #include <d3d12.h>
 #include <ostream>
+#include <wrl.h>
 
 ///// ----- ShaderProgram ----- /////
 
@@ -32,6 +33,6 @@ public:
 
 private:
 	DxcCompiler dxcCompiler_;
-	IDxcBlob* vertexShaderBlob_ = nullptr;
-	IDxcBlob* pixelShaderBlob_ = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob_;
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob_;
 };

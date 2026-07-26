@@ -8,6 +8,7 @@
 #include "TextureManager.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,7 @@
 // 描画時にMaterialごとの定数バッファとUV Transformを保持する
 struct ModelMaterialRuntimeData {
 	// Material専用の定数バッファ
-	ID3D12Resource* resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource;
 
 	// 定数バッファへ書き込むアドレス
 	Material* data = nullptr;
@@ -133,11 +134,11 @@ private:
 	VertexBuffer vertexBuffer_;
 
 	// OBJモデル専用のマテリアル
-	ID3D12Resource* materialResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Material* materialData_ = nullptr;
 
 	// OBJモデル専用のWVP
-	ID3D12Resource* wvpResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	TransformationMatrix* wvpData_ = nullptr;
 
 	// モデルの拡縮・回転・移動

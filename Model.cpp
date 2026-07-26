@@ -449,18 +449,12 @@ void Model::Finalize() {
 	materialData_ = nullptr;
 
 	// Materialリソースを解放する
-	if (materialResource_ != nullptr) {
-		materialResource_->Release();
-		materialResource_ = nullptr;
-	}
+	// MaterialResourceはComPtrのデストラクタが自動解放する
 
 	wvpData_ = nullptr;
 
 	// WVPリソースを解放する
-	if (wvpResource_ != nullptr) {
-		wvpResource_->Release();
-		wvpResource_ = nullptr;
-	}
+	// WVPResourceはComPtrのデストラクタが自動解放する
 
 	// Materialごとの定数バッファを解放する
 	for (ModelMaterialRuntimeData& runtimeData :
@@ -468,10 +462,7 @@ void Model::Finalize() {
 
 		runtimeData.data = nullptr;
 
-		if (runtimeData.resource != nullptr) {
-			runtimeData.resource->Release();
-			runtimeData.resource = nullptr;
-		}
+		// 各MaterialResourceはvectorのclear時にComPtrが解放する
 	}
 
 	// Materialごとの管理データを空にする

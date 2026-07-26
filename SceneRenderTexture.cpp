@@ -44,7 +44,7 @@ void SceneRenderTexture::Initialize(
 		&resourceDesc,
 		currentState_,
 		&clearValue,
-		IID_PPV_ARGS(&resource_)
+		IID_PPV_ARGS(resource_.GetAddressOf())
 	);
 	assert(SUCCEEDED(hr));
 
@@ -52,11 +52,11 @@ void SceneRenderTexture::Initialize(
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.NumDescriptors = 1;
-	hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap_));
+	hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(rtvDescriptorHeap_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
 	rtvHandle_ = rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
-	device->CreateRenderTargetView(resource_, nullptr, rtvHandle_);
+	device->CreateRenderTargetView(resource_.Get(), nullptr, rtvHandle_);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Format = format;
@@ -67,7 +67,7 @@ void SceneRenderTexture::Initialize(
 	const D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU =
 		srvDescriptorHeap.GetCPUHandle(srvDescriptorIndex);
 	srvHandleGPU_ = srvDescriptorHeap.GetGPUHandle(srvDescriptorIndex);
-	device->CreateShaderResourceView(resource_, &srvDesc, srvHandleCPU);
+	device->CreateShaderResourceView(resource_.Get(), &srvDesc, srvHandleCPU);
 }
 
 // ゲーム描画前にRenderTarget状態へ切り替える
@@ -90,7 +90,7 @@ void SceneRenderTexture::Transition(
 
 	D3D12_RESOURCE_BARRIER barrier{};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Transition.pResource = resource_;
+	barrier.Transition.pResource = resource_.Get();
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = currentState_;
 	barrier.Transition.StateAfter = nextState;
@@ -100,14 +100,7 @@ void SceneRenderTexture::Transition(
 
 // Scene用リソースを解放する
 void SceneRenderTexture::Finalize() {
-	if (resource_ != nullptr) {
-		resource_->Release();
-		resource_ = nullptr;
-	}
-	if (rtvDescriptorHeap_ != nullptr) {
-		rtvDescriptorHeap_->Release();
-		rtvDescriptorHeap_ = nullptr;
-	}
+	// ResourceとDescriptorHeapはComPtrのデストラクタが自動解放する
 	rtvHandle_ = {};
 	srvHandleGPU_ = {};
 	currentState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

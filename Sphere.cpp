@@ -348,17 +348,11 @@ void Sphere::Finalize() {
 
 	materialData_ = nullptr;
 
-	if (materialResource_ != nullptr) {
-		materialResource_->Release();
-		materialResource_ = nullptr;
-	}
+	// MaterialResourceはComPtrのデストラクタが自動解放する
 
 	wvpData_ = nullptr;
 
-	if (wvpResource_ != nullptr) {
-		wvpResource_->Release();
-		wvpResource_ = nullptr;
-	}
+	// WVPResourceはComPtrのデストラクタが自動解放する
 
 	subdivision_ = 0;
 	maxSubdivision_ = 0;
@@ -368,9 +362,6 @@ void Sphere::Finalize() {
 	indexData_ = nullptr;
 	indexBufferView_ = {};
 	// SphereのIndex Resourceを解放する
-	if (indexResource_ != nullptr) {
-		indexResource_->Release();
-		indexResource_ = nullptr;
-	}
+	// IndexResourceはComPtrのデストラクタが自動解放する
 	indexCount_ = 0;
 }

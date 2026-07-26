@@ -3,6 +3,7 @@
 #include "VertexData.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 
 ///// ----- VertexBuffer ----- /////
@@ -31,7 +32,8 @@ public:
 	void Finalize();
 
 private:
-	ID3D12Resource* vertexResource_ = nullptr;
+	// VertexResourceをComPtrで自動解放する
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 	VertexData* vertexData_ = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 };

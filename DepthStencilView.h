@@ -1,10 +1,9 @@
 #pragma once
 
 #include "DescriptorHeap.h"
-#include "ResourceObject.h"
-
 #include <d3d12.h>
 #include <cstdint>
+#include <wrl.h>
 
 ///// ----- DSV(Depth Stencil View) ----- /////
 
@@ -31,10 +30,10 @@ public:
 private:
 	/// --- DepthStencilTexture ---
 	// DepthStencilTextureResourceを作成
-	ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height);
 
-	// デストラクタでDepthStencilResourceを自動解放する
-	ResourceObject depthStencilResource_;
+	// DepthStencilResourceをComPtrで自動解放する
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource_;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{};
 };

@@ -207,24 +207,15 @@ void Sprite2D::Finalize() {
 	vertexBuffer_.Finalize();
 
 	materialData_ = nullptr;
-	if (materialResource_ != nullptr) {
-		materialResource_->Release();
-		materialResource_ = nullptr;
-	}
+	// MaterialResourceはComPtrのデストラクタが自動解放する
 
 	wvpData_ = nullptr;
-	if (wvpResource_ != nullptr) {
-		wvpResource_->Release();
-		wvpResource_ = nullptr;
-	}
+	// WVPResourceはComPtrのデストラクタが自動解放する
 
 	clientWidth_ = 0;
 	clientHeight_ = 0;
 
 	// SpriteのIndex Resourceを解放する
 	indexBufferView_ = {};
-	if (indexResource_ != nullptr) {
-		indexResource_->Release();
-		indexResource_ = nullptr;
-	}
+	// IndexResourceはComPtrのデストラクタが自動解放する
 }

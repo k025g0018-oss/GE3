@@ -16,7 +16,7 @@ void DescriptorHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE
 	descriptorHeapDesc.Type = heapType; // ヒープタイプ
 	descriptorHeapDesc.NumDescriptors = numDescriptors;
 	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	HRESULT hr = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap_));
+	HRESULT hr = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(descriptorHeap_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
 	// Descriptor1個分のサイズを保存
@@ -64,10 +64,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GetGPUHandle(uint32_t index) const {
 /// --- 終了処理 ---
 // DescriptorHeapを解放
 void DescriptorHeap::Finalize() {
-	if (descriptorHeap_ != nullptr) {
-		descriptorHeap_->Release();
-		descriptorHeap_ = nullptr;
-	}
+	// DescriptorHeapはComPtrのデストラクタが自動解放する
 	descriptorSize_ = 0;
 	descriptorCount_ = 0;
 }

@@ -5,6 +5,7 @@
 #include "Material.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 
 class Sphere {
@@ -73,7 +74,7 @@ private:
 	void GenerateVertices();
 
 	// Sphereの頂点番号を保存するIndex Resource
-	ID3D12Resource* indexResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_;
 
 	// Index Resourceへ書き込むためのアドレス
 	uint32_t* indexData_ = nullptr;
@@ -88,12 +89,12 @@ private:
 	VertexBuffer vertexBuffer_;
 
 	// Sphere専用Material
-	ID3D12Resource* materialResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	// Sphere専用のMaterialを書き込む
 	Material* materialData_ = nullptr;
 
 	// Sphere専用WVP
-	ID3D12Resource* wvpResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	TransformationMatrix* wvpData_ = nullptr;
 
 	Transform transform_{};

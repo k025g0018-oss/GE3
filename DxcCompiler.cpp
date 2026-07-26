@@ -14,26 +14,26 @@ DxcCompiler::~DxcCompiler() {
 /// --- 初期化 ---
 // dxcCompilerを初期化
 void DxcCompiler::Initialize() {
-	HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils_));
+	HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(dxcUtils_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
-	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler_));
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(dxcCompiler_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
 	// 現時点でincludeはしないが、includeに対応するための設定を行っておく
-	hr = dxcUtils_->CreateDefaultIncludeHandler(&includeHandler_);
+	hr = dxcUtils_->CreateDefaultIncludeHandler(includeHandler_.GetAddressOf());
 	assert(SUCCEEDED(hr));
 }
 
 /// --- Shaderのコンパイル ---
 // CompileShader関数
-IDxcBlob* DxcCompiler::CompileShader(const std::wstring& filePath, const wchar_t* profile, std::ostream& logStream) {
+Microsoft::WRL::ComPtr<IDxcBlob> DxcCompiler::CompileShader(const std::wstring& filePath, const wchar_t* profile, std::ostream& logStream) {
 	/// --- HLSLファイルの読み込み ---
 	// 1_HLSLファイルを読む
 	// シェーダーをコンパイルする旨をログに出す
 	Log(logStream, ConvertString(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
 	// hlslファイルを読む
-	IDxcBlobEncoding* shaderSource = nullptr;
-	HRESULT hr = dxcUtils_->LoadFile(filePath.c_str(), nullptr, &shaderSource);
+	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource;
+	HRESULT hr = dxcUtils_->LoadFile(filePath.c_str(), nullptr, shaderSource.GetAddressOf());
 	// 読めなかったら止める
 	assert(SUCCEEDED(hr));
 	// 読み込んだファイルの内容を設定する
@@ -54,13 +54,13 @@ IDxcBlob* DxcCompiler::CompileShader(const std::wstring& filePath, const wchar_t
 	};
 
 	// 実際にShaderをコンパイルする
-	IDxcResult* shaderResult = nullptr;
+	Microsoft::WRL::ComPtr<IDxcResult> shaderResult;
 	hr = dxcCompiler_->Compile(
 		&shaderSourceBuffer, // 読み込んだファイル
 		(LPCWSTR*)arguments, // コンパイルオプション
 		(UINT32)_countof(arguments), // コンパイルオプションの数
-		includeHandler_, // includeが含まれた諸々
-		IID_PPV_ARGS(&shaderResult) // コンパイル結果
+		includeHandler_.Get(), // includeが含まれた諸々
+		IID_PPV_ARGS(shaderResult.GetAddressOf()) // コンパイル結果
 	);
 
 	// コンパイルエラー出なくdxcが起動できないなど致命的な状況
@@ -69,28 +69,24 @@ IDxcBlob* DxcCompiler::CompileShader(const std::wstring& filePath, const wchar_t
 	/// --- 警告とエラーの確認 ---
 	// 3_警告・エラーが出ていないか確認する
 	// 出ていたらログに出して止める
-	IDxcBlobUtf8* shaderError = nullptr;
-	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> shaderError;
+	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(shaderError.GetAddressOf()), nullptr);
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
 		Log(logStream, shaderError->GetStringPointer());
 		// 警告・エラー
 		assert(false);
 	}
-	if (shaderError != nullptr) {
-		shaderError->Release();
-	}
 
 	/// --- Compile結果の取得 ---
 	// 4_Compile結果を受け取って返す
 	// コンパイル結果から実行用のバイナリ部分を取得
-	IDxcBlob* shaderBlob = nullptr;
-	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
+	Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob;
+	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(shaderBlob.GetAddressOf()), nullptr);
 	assert(SUCCEEDED(hr));
 	// 成功したログを出す
 	Log(logStream, ConvertString(std::format(L"Compile Succeeded, path:{}, profile:{}\n", filePath, profile)));
 	// もう使わないリソースを開放
-	shaderSource->Release();
-	shaderResult->Release();
+	// 一時COMオブジェクトはComPtrが自動解放する
 	// 実行用のバイナリを返却
 	return shaderBlob;
 }
@@ -98,16 +94,5 @@ IDxcBlob* DxcCompiler::CompileShader(const std::wstring& filePath, const wchar_t
 /// --- 終了処理 ---
 // DXC関連のツールを解放
 void DxcCompiler::Finalize() {
-	if (includeHandler_ != nullptr) {
-		includeHandler_->Release();
-		includeHandler_ = nullptr;
-	}
-	if (dxcCompiler_ != nullptr) {
-		dxcCompiler_->Release();
-		dxcCompiler_ = nullptr;
-	}
-	if (dxcUtils_ != nullptr) {
-		dxcUtils_->Release();
-		dxcUtils_ = nullptr;
-	}
+	// DXC関連のCOMオブジェクトはComPtrのデストラクタが自動解放する
 }

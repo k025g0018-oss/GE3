@@ -1038,7 +1038,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 	ComPtr<ID3D12Resource> wvpResource;
 	// Createが返した所有権をComPtrへ移す
-	wvpResource.Attach(BufferResource::Create(device.Get(), sizeof(TransformationMatrix)));
+	wvpResource = BufferResource::Create(device.Get(), sizeof(TransformationMatrix));
 	// データを書き込む
 	TransformationMatrix* wvpData = nullptr;
 	// 書き込むためのアドレスを取得
@@ -1085,7 +1085,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- Material用のリソースを作る ---
 	ComPtr<ID3D12Resource> materialResource;
 	// Createが返した所有権をComPtrへ移す
-	materialResource.Attach(BufferResource::Create(device.Get(), sizeof(Material)));
+	materialResource = BufferResource::Create(device.Get(), sizeof(Material));
 	// マテリアルにデータを書き込む
 	Material* materialData = nullptr;
 	// 書き込むためのアドレスを取得
@@ -1103,9 +1103,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/// --- 平行光源用の定数バッファを作成する ---
 	ComPtr<ID3D12Resource> directionalLightResource;
 	// Createが返した所有権をComPtrへ移す
-	directionalLightResource.Attach(
-		BufferResource::Create(device.Get(), sizeof(DirectionalLight))
-	);
+	directionalLightResource = BufferResource::Create(device.Get(), sizeof(DirectionalLight));
 	// CPUから光源情報を書き込むアドレス
 	DirectionalLight* directionalLightData = nullptr;
 	HRESULT directionalLightMapResult =

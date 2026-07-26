@@ -6,6 +6,7 @@
 #include "Material.h"
 
 #include <d3d12.h>
+#include <wrl.h>
 #include <cstdint>
 
 // 三角形・三角錐の頂点、Material、WVP、描画をまとめて管理するクラス
@@ -123,11 +124,11 @@ private:
 	// Primitive3D専用の頂点リソース
 	VertexBuffer vertexBuffer_;
 	// ピクセルシェーダーへ渡すMaterialの色
-	ID3D12Resource* materialResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	// Primitive3D専用Material
 	Material* materialData_ = nullptr;
 	// 頂点シェーダーへ渡すWorld・View・Projection行列
-	ID3D12Resource* wvpResource_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	TransformationMatrix* wvpData_ = nullptr;
 
 	// 図形全体へ適用するTransformと再生状態
