@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <wrl.h>
 
 ///// ----- CommandContext ----- /////
 
@@ -28,10 +29,10 @@ public:
 
 	/// --- 取得 ---
 	// CommandQueueを取得
-	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue_; }
+	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue_.Get(); }
 
 	// CommandListを取得
-	ID3D12GraphicsCommandList* GetCommandList() const { return commandList_; }
+	ID3D12GraphicsCommandList* GetCommandList() const { return commandList_.Get(); }
 
 	/// --- 終了処理 ---
 	// コマンド関連のリソースを解放
@@ -46,10 +47,10 @@ private:
 	// CommandAllocatorとCommandListをリセット
 	void Reset();
 
-	ID3D12CommandQueue* commandQueue_ = nullptr;
-	ID3D12CommandAllocator* commandAllocator_ = nullptr;
-	ID3D12GraphicsCommandList* commandList_ = nullptr;
-	ID3D12Fence* fence_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue_;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator_;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList_;
+	Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
 	uint64_t fenceValue_ = 0;
 	HANDLE fenceEvent_ = nullptr;
 };

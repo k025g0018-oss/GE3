@@ -14,25 +14,31 @@ void CommandContext::Initialize(ID3D12Device* device) {
 	/// --- CommandQueue ---
 	// CommandQueueの生成
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-	HRESULT hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue_));
+	HRESULT hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(commandQueue_.GetAddressOf()));
 	// コマンドキューの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
 	/// --- CommandAllocator ---
 	// コマンドアロケータの生成
-	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator_));
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(commandAllocator_.GetAddressOf()));
 	// コマンドアロケータの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
 	/// --- CommandList ---
 	// コマンドリストの生成
-	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator_, nullptr, IID_PPV_ARGS(&commandList_));
+	hr = device->CreateCommandList(
+		0,
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		commandAllocator_.Get(),
+		nullptr,
+		IID_PPV_ARGS(commandList_.GetAddressOf())
+	);
 	// コマンドリストの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
 	/// --- Fence ---
 	// 初期値0でFenceを作る
-	hr = device->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
+	hr = device->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
 	// FenceのSignalを持つためのイベントを作成する
@@ -48,7 +54,7 @@ void CommandContext::ExecuteAndWait() {
 	assert(SUCCEEDED(hr));
 
 	// GPUにコマンドリストの実行を行わせる
-	ID3D12CommandList* commandLists[] = {commandList_};
+	ID3D12CommandList* commandLists[] = {commandList_.Get()};
 	commandQueue_->ExecuteCommandLists(1, commandLists);
 
 	// GPUの実行完了を待つ
@@ -66,7 +72,7 @@ void CommandContext::ExecuteAndPresent(IDXGISwapChain4* swapChain) {
 
 	/// --- キックする ---
 	// GPUにコマンドリストの実行を行わせる
-	ID3D12CommandList* commandLists[] = {commandList_};
+	ID3D12CommandList* commandLists[] = {commandList_.Get()};
 	commandQueue_->ExecuteCommandLists(1, commandLists);
 	// GPUとOSに画面の交換を行うよう通知する
 	hr = swapChain->Present(1, 0);
@@ -86,7 +92,7 @@ void CommandContext::WaitForGPU() {
 	// Fenceの値を更新
 	fenceValue_++;
 	// GPU画がここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-	HRESULT hr = commandQueue_->Signal(fence_, fenceValue_);
+	HRESULT hr = commandQueue_->Signal(fence_.Get(), fenceValue_);
 	assert(SUCCEEDED(hr));
 	// Fenceの値が指定したSignal値にたどり着いているか確認する
 	// GetCompletedValueの初期値はFence作成時に渡した初期値
@@ -104,7 +110,7 @@ void CommandContext::WaitForGPU() {
 void CommandContext::Reset() {
 	HRESULT hr = commandAllocator_->Reset();
 	assert(SUCCEEDED(hr));
-	hr = commandList_->Reset(commandAllocator_, nullptr);
+	hr = commandList_->Reset(commandAllocator_.Get(), nullptr);
 	assert(SUCCEEDED(hr));
 }
 
@@ -115,20 +121,5 @@ void CommandContext::Finalize() {
 		CloseHandle(fenceEvent_);
 		fenceEvent_ = nullptr;
 	}
-	if (fence_ != nullptr) {
-		fence_->Release();
-		fence_ = nullptr;
-	}
-	if (commandList_ != nullptr) {
-		commandList_->Release();
-		commandList_ = nullptr;
-	}
-	if (commandAllocator_ != nullptr) {
-		commandAllocator_->Release();
-		commandAllocator_ = nullptr;
-	}
-	if (commandQueue_ != nullptr) {
-		commandQueue_->Release();
-		commandQueue_ = nullptr;
-	}
+	// COMオブジェクトはComPtrのデストラクタが自動解放する
 }
