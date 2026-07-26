@@ -758,12 +758,29 @@ void DrawContentBrowserAssets(const TextureManager& textureManager) {
 
 #pragma endregion 関数の定義エリア
 
+/// --- DirectX12リソースリークチェック ---
+struct D3DResourceLeakChecker {
+	~D3DResourceLeakChecker() {
+		// すべてのComPtrが解放された後にリソースリークを確認する
+		ComPtr<IDXGIDebug1> debug;
+		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(debug.GetAddressOf())))) {
+			debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+			debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+			debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+		}
+	}
+};
+
 /// --- メイン処理 ---
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// COMの初期化
 	HRESULT hr = CoInitializeEx(0, COINIT_MULTITHREADED);
 	assert(SUCCEEDED(hr));
+
+	{
+		// 最初に生成し、ほかのローカル変数より最後にデストラクタを呼ぶ
+		D3DResourceLeakChecker leakChecker;
 
 	// 誰も捕捉しなかった場合に(Unhandled)、捕捉する関数を登録
 	// main関数が始まってすぐに登録
@@ -2467,14 +2484,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// DX12リソースがなくなった後にウィンドウを閉じる
 	CloseWindow(hwnd);
 
-	/// --- ReportLiveObjects ---
-	// リソースリークチェック
-	ComPtr<IDXGIDebug1> debug;
-	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(debug.GetAddressOf())))) {
-		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
-		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-	}
+	} // leakCheckerより後に作られたComPtrを先に解放する
 
 	// COMの終了処理
 	CoUninitialize();
