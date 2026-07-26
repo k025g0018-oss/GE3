@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DescriptorHeap.h"
+#include "ResourceObject.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -32,6 +33,8 @@ private:
 	// DepthStencilTextureResourceを作成
 	ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height);
 
-	ID3D12Resource* depthStencilResource_ = nullptr;
+	// デストラクタでDepthStencilResourceを自動解放する
+	ResourceObject depthStencilResource_;
+
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{};
 };

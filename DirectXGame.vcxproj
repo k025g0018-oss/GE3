@@ -134,6 +134,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Primitive3D.cpp" />
     <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="RasterizerState.cpp" />
+    <ClCompile Include="ResourceObject.cpp" />
     <ClCompile Include="RootSignature.cpp" />
     <ClCompile Include="SceneRenderTexture.cpp" />
     <ClCompile Include="ShaderProgram.cpp" />
@@ -190,6 +191,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Primitive3D.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="RasterizerState.h" />
+    <ClInclude Include="ResourceObject.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SceneRenderTexture.h" />
     <ClInclude Include="ShaderProgram.h" />

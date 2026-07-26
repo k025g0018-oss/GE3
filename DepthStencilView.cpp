@@ -12,7 +12,10 @@ DepthStencilView::~DepthStencilView() {
 // DepthStencilTextureとDSVを作成
 void DepthStencilView::Initialize(ID3D12Device* device, const DescriptorHeap& dsvDescriptorHeap, int32_t width, int32_t height) {
 	// 深度ステンシルテクスチャリソースを作る
-	depthStencilResource_ = CreateDepthStencilTextureResource(device, width, height);
+	// 生成したResourceの所有権をResourceObjectへ渡す
+	depthStencilResource_.Reset(
+		CreateDepthStencilTextureResource(device, width, height)
+	);
 
 	// DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -20,7 +23,13 @@ void DepthStencilView::Initialize(ID3D12Device* device, const DescriptorHeap& ds
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; // 2dTexture
 	// DSVHeapの先頭にDSVを作る
 	dsvHandle_ = dsvDescriptorHeap.GetCPUHandleStart();
-	device->CreateDepthStencilView(depthStencilResource_, &dsvDesc, dsvHandle_);
+
+	// DirectXの関数へ渡すときは生ポインタを取得する
+	device->CreateDepthStencilView(
+		depthStencilResource_.Get(),
+		&dsvDesc,
+		dsvHandle_
+	);
 }
 
 /// --- DepthStencilTexture ---
@@ -65,8 +74,8 @@ ID3D12Resource* DepthStencilView::CreateDepthStencilTextureResource(ID3D12Device
 // DepthStencilTextureを解放
 void DepthStencilView::Finalize() {
 	dsvHandle_ = {};
-	if (depthStencilResource_ != nullptr) {
-		depthStencilResource_->Release();
-		depthStencilResource_ = nullptr;
-	}
+	
+	// Deviceを解放する前にDepthStencilResourceを解放する
+	// デストラクタから再度Resetされてもnullptrなので二重解放されない
+	depthStencilResource_.Reset();
 }
