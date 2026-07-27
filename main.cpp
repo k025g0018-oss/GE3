@@ -22,6 +22,7 @@
 #include "ModelLoader.h"
 #include "Model.h"
 #include "Audio.h"
+#include "DirectInput.h"
 
 #include <windows.h>
 #include <cstdint> // int32_t
@@ -859,6 +860,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// ウィンドウを表示する
 		ShowWindow(hwnd, SW_SHOW);
+
+		// DirectInputを初期化する
+		DirectInput directInput;
+		directInput.Initialize(GetModuleHandle(nullptr), hwnd);
 
 		/// --- DebugLayer ---
 
