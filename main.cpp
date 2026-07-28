@@ -1744,6 +1744,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #endif // USE_IMGUI
 
+				///// ----- キーボードの処理 ----- /////
+				
+				// 毎フレーム、キーボード状態を更新する
+				directInput.Update();
+
+				// 上段の0キーを押している間、毎フレーム「0」を表示する
+				if (directInput.IsPress(DIK_0)) {
+					OutputDebugStringA("0\n");
+				}
+
+				// 上段の1キーを押した瞬間だけ「1」を表示する
+				if (directInput.IsTrigger(DIK_1)) {
+					OutputDebugStringA("1\n");
+				}
+
 				///// ----- ゲームの処理 ----- /////
 				/// --- カメラ ---
 				camera.Update();

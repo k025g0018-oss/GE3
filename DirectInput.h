@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <wrl.h>
+#include <cstdint>
 
 #define DIRECTINPUT_VERSION 0x0800 // DirectInputのバージョン指定
 #include <dinput.h>
@@ -36,8 +37,15 @@ public:
 	/// 解放処理
 	/// </summary>
 	
-	// キーが押されているか確認する
-	bool IsPress(BYTE key) const;
+	/// <summary>
+	/// キーが押されている間trueを返す
+	/// </summary>
+	bool IsPress(uint8_t keyNumber) const;
+
+	/// <summary>
+	/// キーを押した瞬間だけtrueを返す
+	/// </summary>
+	bool IsTrigger(uint8_t keyNumber) const;
 
 private:
 	// DirectInput本体を自動解放する
@@ -46,4 +54,9 @@ private:
 	// 毎フレーム入力状態を取得するキーボードデバイス
 	Microsoft::WRL::ComPtr<IDirectInputDevice8> keyboard_;
 
+	// 現在のフレームのキー入力状態
+	BYTE keys_[256]{};
+
+	// 1フレーム前のキー入力状態
+	BYTE previousKeys_[256]{};
 };
