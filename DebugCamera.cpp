@@ -13,6 +13,13 @@ void DebugCamera::Initialize(float aspectRatio) {
 	// Projection行列へ使用する画面の縦横比を保存する
 	aspectRatio_ = aspectRatio;
 
+	// ピボット回転を初期状態へ戻して行列を作成する
+	Reset();
+}
+
+///// ----- リセット ----- /////
+
+void DebugCamera::Reset() {
 	// 累積回転行列は単位行列から開始する
 	matRot_ = Matrix4x4::MakeIdentity4x4();
 
@@ -26,7 +33,7 @@ void DebugCamera::Initialize(float aspectRatio) {
 	// ターゲットからカメラまでの初期距離
 	distance_ = 50.0f;
 
-	// 初期座標と初期角度から行列を作成する
+	// リセットした値からView・Projection行列を作り直す
 	Update();
 }
 

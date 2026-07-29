@@ -446,6 +446,7 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& prim
 void DrawStatistics(
 	const ParticleSystem& particleSystem,
 	Camera& camera,
+	DebugCamera& debugCamera,
 	bool& isPrimitive3DVisible,
 	bool& isParticleVisible,
 	bool& isSphereVisible,
@@ -536,6 +537,20 @@ void DrawStatistics(
 	);
 	ImGui::TextDisabled(
 		"Scene Wheel : Zoom"
+	);
+
+	ImGui::Separator();
+
+	// ピボット回転を行うDebugCamera専用の操作欄
+	ImGui::TextUnformatted("Debug Camera");
+
+	if (ImGui::Button("Reset Debug Camera")) {
+		// 累積回転、回転中心、距離を初期状態へ戻す
+		debugCamera.Reset();
+	}
+
+	ImGui::TextDisabled(
+		"Pivot Target : World Origin"
 	);
 
 	ImGui::End();
@@ -1766,6 +1781,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				DrawStatistics(
 					particleSystem,
 					camera,
+					debugCamera,
 					isPrimitive3DVisible,
 					isParticleVisible,
 					isSphereVisible,

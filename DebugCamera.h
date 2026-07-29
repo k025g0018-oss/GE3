@@ -29,6 +29,11 @@ public:
 	// ホイール量をカメラ基準の前後移動へ反映する
 	void MoveForwardByMouse(float wheel);
 
+	///// ----- リセット ----- /////
+
+	// 累積回転、回転中心、距離を初期状態へ戻す
+	void Reset();
+
 	///// ----- Getter ----- /////
 
 	// 3DオブジェクトのWVP計算へ渡す行列を取得する
@@ -76,6 +81,6 @@ private:
 	// マウスの入力値へ掛ける操作速度
 	float rotateSpeed_ = 0.005f;
 	float moveSpeed_ = 0.01f;
-	float forwardSpeed_ = 0.3f;
+	float forwardSpeed_ = 0.8f;
 };
 
