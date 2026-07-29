@@ -33,44 +33,35 @@ void DebugCamera::Initialize(float aspectRatio) {
 ///// ----- 更新処理 ----- /////
 
 void DebugCamera::Update() {
-	/*
-	// X、Y、Z軸の回転行列を作成する
-	const Matrix4x4 rotateXMatrix =
-		Matrix4x4::MakeRotateXMatrix(rotation_.x);
-	const Matrix4x4 rotateYMatrix =
-		Matrix4x4::MakeRotateYMatrix(rotation_.y);
-	const Matrix4x4 rotateZMatrix =
-		Matrix4x4::MakeRotateZMatrix(rotation_.z);
-	*/
+	// ターゲットから見たカメラの初期相対座標を作る
+	Vector3 cameraOffset = {
+		0.0f,
+		0.0f,
+		-distance_
+	};
 
-	// 追加回転分の回転行列を作成
-	Matrix4x4 matRotDelta = Matrix4x4::MakeIdentity();
-	matRotDelta *= Matrix4x4::MakeRotateXMatrix(今回のX軸回転角度);
-	matRotDelta *= Matrix4x4::MakeRotateYMatrix();
+	// 累積回転行列で相対座標を回転させる
+	cameraOffset =
+		Vector3::Transform(
+			cameraOffset,
+			matRot_);
 
-	// 各軸の回転を1つの回転行列へまとめる
-	const Matrix4x4 rotateMatrix =
-		Matrix4x4::Multiply(
-			rotateXMatrix,
-			Matrix4x4::Multiply(
-			rotateYMatrix,
-			rotateZMatrix)
-		);
+	// ターゲット座標へ回転後の相対座標を足してカメラ座標を求める
+	translation_ =
+		target_ + cameraOffset;
 
-	// カメラの座標から平行移動行列を作成する
-	const Matrix4x4 translateMatrix =
-		Matrix4x4::MakeTranslateMatrix(translation_);
+	// 計算したカメラ座標から平行移動行列を作成する
+	const Matrix4x4 translateMatrix = Matrix4x4::MakeTranslateMatrix(translation_);
 
-	// 回転行列と平行移動行列からカメラのWorld行列を作成する
+	// 累積回転行列と平行移動行列からカメラのWorld行列を作成する
 	const Matrix4x4 cameraWorldMatrix =
 		Matrix4x4::Multiply(
-			rotateMatrix,
+			matRot_,
 			translateMatrix
 		);
 
 	// カメラのWorld行列の逆行列をView行列にする
-	viewMatrix_ =
-		Matrix4x4::Inverse(cameraWorldMatrix);
+	viewMatrix_ = Matrix4x4::Inverse(cameraWorldMatrix);
 
 	// 画角や縦横比から透視投影行列を作成する
 	projectionMatrix_ =
@@ -85,36 +76,29 @@ void DebugCamera::Update() {
 ///// ----- マウス操作 ----- /////
 
 // 左ドラッグ量をX・Y軸回転へ反映する
-void DebugCamera::RotateByMouse(
-	const Vector2& mouseDelta) {
+void DebugCamera::RotateByMouse(const Vector2& mouseDelta) {
+	// 今回のマウス移動量から追加するX軸回転角を計算する
+	const float deltaRotateX = mouseDelta.y * rotateSpeed_;
 
-	// マウスの横移動をY軸回転へ反映する
-	rotation_.y +=
-		mouseDelta.x * rotateSpeed_;
+	// 今回のマウス移動量から追加するY軸回転角を計算する
+	const float deltaRotateY = mouseDelta.x * rotateSpeed_;
 
-	// マウスの縦移動をX軸回転へ反映する
-	rotation_.x +=
-		mouseDelta.y * rotateSpeed_;
+	// 今回追加するX軸回転行列を作成する
+	const Matrix4x4 matRotX = Matrix4x4::MakeRotateXMatrix(deltaRotateX);
 
-	// 真上・真下を越えて操作が反転することを防ぐ
-	rotation_.x = (std::clamp)(
-			rotation_.x,
-			-1.45f,
-			1.45f
-			);
+	// 今回追加するY軸回転行列を作成する
+	const Matrix4x4 matRotY = Matrix4x4::MakeRotateYMatrix(deltaRotateY);
+
+	// X軸とY軸の追加回転を1つの行列へまとめる
+	const Matrix4x4 matRotDelta = Matrix4x4::Multiply(matRotX, matRotY);
+
+	// 今回の回転を以前までの累積回転へ合成する
+	matRot_ = Matrix4x4::Multiply(matRotDelta, matRot_);
 }
 
 // 右ドラッグ量をカメラ基準の上下左右移動へ反映する
 void DebugCamera::MoveByMouse(const Vector2& mouseDelta) {
-	// 現在のカメラ角度から回転行列を作成する
-	const Matrix4x4 rotateMatrix =
-		Matrix4x4::Multiply(
-			Matrix4x4::MakeRotateXMatrix(rotation_.x),
-			Matrix4x4::Multiply(
-			Matrix4x4::MakeRotateYMatrix(rotation_.y),
-			Matrix4x4::MakeRotateZMatrix(rotation_.z)));
-
-	// マウスの移動量をカメラのローカル移動量へ変換する
+	// マウス移動量からカメラ基準の平行移動量を作る
 	Vector3 move = {
 		-mouseDelta.x * moveSpeed_,
 		mouseDelta.y * moveSpeed_,
@@ -125,37 +109,22 @@ void DebugCamera::MoveByMouse(const Vector2& mouseDelta) {
 	move =
 		Vector3::Transform(
 			move,
-			rotateMatrix);
+			matRot_
+		);
 
 	// 回転後の移動量をカメラ座標へ加算する
-	translation_ =
-		translation_ + move;
+	target_ = target_ + move;
 }
 
 // ホイール量をカメラ基準の前後移動へ反映する
 void DebugCamera::MoveForwardByMouse(float wheel) {
-	// 現在のカメラ角度から回転行列を作成する
-	const Matrix4x4 rotateMatrix =
-		Matrix4x4::Multiply(
-			Matrix4x4::MakeRotateXMatrix(rotation_.x),
-			Matrix4x4::Multiply(
-			Matrix4x4::MakeRotateYMatrix(rotation_.y),
-			Matrix4x4::MakeRotateZMatrix(rotation_.z)));
+	// ホイール入力でターゲットとの距離を変更する
+	distance_ -=
+		wheel * forwardSpeed_;
 
-	// ホイール量からカメラのローカル前後移動量を作成する
-	Vector3 move = {
-		0.0f,
-		0.0f,
-		wheel * forwardSpeed_
-	};
-
-	// カメラの角度に合わせて前後方向を回転する
-	move =
-		Vector3::Transform(
-			move,
-			rotateMatrix);
-
-	// 回転後の移動量をカメラ座標へ加算する
-	translation_ =
-		translation_ + move;
+	// カメラがターゲットを通り越さないよう最小距離を設定する
+	distance_ =
+		(std::max)(
+			distance_,
+			0.1f);
 }

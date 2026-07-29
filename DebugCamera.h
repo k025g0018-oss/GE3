@@ -58,7 +58,7 @@ private:
 	};
 
 	// ターゲットからカメラまでの距離
-	float distance_ = nullptr;
+	float distance_;
 
 	// ローカル座標
 	Vector3 translation_ = {0.0f, 0.0f, -50.0f};
