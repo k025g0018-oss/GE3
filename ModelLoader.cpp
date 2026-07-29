@@ -90,19 +90,44 @@ ModelData ModelLoader::LoadObjFile(
 
 				// 頂点の要素へのIndexは「位置/UV/法線」で格納されているので、分解してIndexを取得する
 				std::istringstream v(vertexDefinition);
-				uint32_t elementIndices[3];
+				uint32_t elementIndices[3] = {};
 				for (int32_t element = 0; element < 3; ++element) {
 					std::string index;
 					std::getline(v, index, '/'); // /区切りでインデックスを読んでいく
-					elementIndices[element] = std::stoi(index);
+					
+					// 空のUV番号を許可する
+					if (!index.empty()) {
+						elementIndices[element] =
+							static_cast<uint32_t>(
+								std::stoi(index));
+					}
 				}
 
 				// 要素へのIndexから、実際の要素の値を取得して、頂点を構築する
 				Vector4 position = positions[elementIndices[0] - 1];
-				Vector2 texcoord = texcoords[elementIndices[1] - 1];
-				Vector3 normal = normals[elementIndices[2] - 1];
-				// VertexData vertex = {position, texcoord, normal};
-				// modelData.vertices.push_back(vertex);
+
+				// UVがないモデルでは初期値の(0, 0)を使用する
+				Vector2 texcoord = {
+					0.0f,
+					0.0f
+				};
+
+				if (elementIndices[1] != 0) {
+					texcoord =
+						texcoords[elementIndices[1] - 1];
+				}
+
+				// 法線が存在する場合だけ読み込む
+				Vector3 normal = {
+					0.0f,
+					0.0f,
+					0.0f
+				};
+
+				if (elementIndices[2] != 0) {
+					normal =
+						normals[elementIndices[2] - 1];
+				}
 
 				triangle[faceVertex] = {position, texcoord, normal};
 			}

@@ -454,6 +454,9 @@ void DrawStatistics(
 	bool& isAxisVisible,
 	bool& isMultiMeshVisible,
 	bool& isMultiMaterialVisible,
+	bool& isBunnyVisible,
+	bool& isTeapotVisible,
+	bool& isSuzanneVisible,
 	bool& isSpriteVisible
 ) {
 	ImGui::Begin("Statistics");
@@ -488,6 +491,10 @@ void DrawStatistics(
 		isAxisVisible = true;
 		isMultiMeshVisible = true;
 		isMultiMaterialVisible = true;
+		// 追加したOBJモデルも一括表示の対象にする
+		isBunnyVisible = true;
+		isTeapotVisible = true;
+		isSuzanneVisible = true;
 		isSpriteVisible = true;
 	}
 
@@ -502,6 +509,10 @@ void DrawStatistics(
 		isAxisVisible = false;
 		isMultiMeshVisible = false;
 		isMultiMaterialVisible = false;
+		// 追加したOBJモデルも一括非表示の対象にする
+		isBunnyVisible = false;
+		isTeapotVisible = false;
+		isSuzanneVisible = false;
 		isSpriteVisible = false;
 	}
 
@@ -1720,6 +1731,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						isAllLightingEnabled);
 					multiMaterialModel.SetLightingEnabled(
 						isAllLightingEnabled);
+					// 追加したOBJモデルにも一括ライティング設定を反映する
+					bunnyModel.SetLightingEnabled(
+						isAllLightingEnabled);
+					teapotModel.SetLightingEnabled(
+						isAllLightingEnabled);
+					suzanneModel.SetLightingEnabled(
+						isAllLightingEnabled);
 
 					// ONにしたときは選択中の方式も全体へ適用する
 					if (isAllLightingEnabled) {
@@ -1734,6 +1752,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						multiMeshModel.GetLightingMode() =
 							allLightingMode;
 						multiMaterialModel.GetLightingMode() =
+							allLightingMode;
+						// 追加したOBJモデルにも選択中の方式を反映する
+						bunnyModel.GetLightingMode() =
+							allLightingMode;
+						teapotModel.GetLightingMode() =
+							allLightingMode;
+						suzanneModel.GetLightingMode() =
 							allLightingMode;
 					}
 				}
@@ -1760,6 +1785,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						multiMeshModel.GetLightingMode() =
 							allLightingMode;
 						multiMaterialModel.GetLightingMode() =
+							allLightingMode;
+						// 追加したOBJモデルの方式も一括で切り替える
+						bunnyModel.GetLightingMode() =
+							allLightingMode;
+						teapotModel.GetLightingMode() =
+							allLightingMode;
+						suzanneModel.GetLightingMode() =
 							allLightingMode;
 					}
 				}
@@ -1887,6 +1919,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					isAxisVisible,
 					isMultiMeshVisible,
 					isMultiMaterialVisible,
+					isBunnyVisible,
+					isTeapotVisible,
+					isSuzanneVisible,
 					isSpriteVisible);
 				DrawFlowGraph(particleSystem, primitive3D);
 
