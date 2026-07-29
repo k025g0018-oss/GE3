@@ -157,8 +157,10 @@ void Sphere::SetSubdivision(uint32_t subdivision) {
 /// <param name="projectionMatrix"></param>
 void Sphere::Update(const Matrix4x4& viewMatrix,
 	const Matrix4x4& projectionMatrix) {
-	// 常に回転する
-	transform_.rotate.y += 0.02f;
+	// 自動回転が有効なときだけY軸方向へ回転させる
+	if (isAutoRotating_) {
+		transform_.rotate.y += 0.02f;
+	}
 
 	// Sphere専用のWorld行列を更新する
 	const Matrix4x4 worldMatrix =

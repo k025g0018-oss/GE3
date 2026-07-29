@@ -49,6 +49,17 @@ public:
 	Transform& GetTransform();
 	uint32_t GetSubdivision() const;
 	uint32_t GetVertexCount() const;
+
+	// 自動回転を開始・停止する
+	void SetAutoRotate(bool enabled) {
+		isAutoRotating_ = enabled;
+	}
+
+	// 現在の自動回転状態を取得する
+	bool IsAutoRotating() const {
+		return isAutoRotating_;
+	}
+
 	// ImGuiからライティング方式を直接変更する
 	int32_t& GetLightingMode() {
 		return materialData_->lightingMode;
@@ -101,5 +112,8 @@ private:
 	uint32_t subdivision_ = 16;
 	uint32_t maxSubdivision_ = 32;
 	uint32_t vertexCount_ = 0;
+
+	// Sphereを自動回転させるかどうかを保持する
+	bool isAutoRotating_ = true;
 
 };

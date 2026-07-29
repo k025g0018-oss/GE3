@@ -36,6 +36,8 @@ private:
 	// Texture選択とParticle設定も同じProperties上で操作する
 	int& textureMode_;
 	ParticleSystem& particleSystem_;
+	// Editorへ接続した時点のSRTをリセット先として保存する
+	Transform initialTransform_{};
 	// Primitive3Dを描画するかどうかをmainと共有する
 	bool& isVisible_;
 };
@@ -51,6 +53,8 @@ private:
 	// 描画本体は所有せず、mainで作成したSprite2Dを参照する
 	Sprite2D& sprite_;
 	int& textureMode_;
+	// Editorへ接続した時点のSRTをリセット先として保存する
+	Transform initialTransform_{};
 	// Spriteを描画するかどうかをmainと共有する
 	bool& isVisible_;
 };
@@ -91,6 +95,9 @@ private:
 	// Sphere専用のTexture選択番号を保持する
 	int& textureMode_;
 
+	// Editorへ接続した時点のSRTをリセット先として保存する
+	Transform initialTransform_{};
+
 	// Sphereを描画するかどうかをmainと共有する
 	bool& isVisible_;
 };
@@ -121,6 +128,9 @@ private:
 
 	// モデル専用のTexture選択番号を保持する
 	int& textureMode_;
+
+	// モデルごとに異なる初期配置をリセット先として保存する
+	Transform initialTransform_{};
 
 	// モデルを描画するかどうかをmainと共有する
 	bool& isVisible_;

@@ -23,6 +23,7 @@ Primitive3DEditorObject::Primitive3DEditorObject(
 	: object_(object),
 	textureMode_(textureMode),
 	particleSystem_(particleSystem),
+	initialTransform_(object.GetTransform()),
 	isVisible_(isVisible) {
 }
 
@@ -61,6 +62,10 @@ void Primitive3DEditorObject::DrawProperties() {
 	Transform& transform = object_.GetTransform();
 	ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
 	ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
+	if (ImGui::Button("Reset SRT")) {
+		// Primitive3D全体のSRTを初期化時の値へ戻す
+		transform = initialTransform_;
+	}
 
 	// Startで回転を開始し、Stopで停止する。停止時の角度は保持する
 	bool& isPlaying = object_.GetIsPlaying();
@@ -83,7 +88,10 @@ void Primitive3DEditorObject::DrawProperties() {
 }
 
 Sprite2DEditorObject::Sprite2DEditorObject(Sprite2D& sprite, int& textureMode, bool& isVisible)
-	: sprite_(sprite), textureMode_(textureMode), isVisible_(isVisible) {}
+	: sprite_(sprite),
+	textureMode_(textureMode),
+	initialTransform_(sprite.GetTransform()),
+	isVisible_(isVisible) {}
 
 void Sprite2DEditorObject::DrawProperties() {
 	// Sprite2D専用のTexture、色、Transformを編集する
@@ -96,6 +104,10 @@ void Sprite2DEditorObject::DrawProperties() {
 	ImGui::DragFloat3("Sprite Scale", &transform.scale.x, 0.01f);
 	ImGui::DragFloat3("Sprite Rotate", &transform.rotate.x, 0.01f);
 	ImGui::DragFloat3("Sprite Translate", &transform.translate.x, 1.0f);
+	if (ImGui::Button("Reset Sprite SRT")) {
+		// SpriteのSRTを初期化時の値へ戻す
+		transform = initialTransform_;
+	}
 	if (ImGui::Button("Reset Sprite")) {
 		sprite_.Reset();
 	}
@@ -171,11 +183,29 @@ void SceneSettingsEditorObject::DrawProperties() {
 		ImGui::SliderFloat3("T1 Scale", object_.GetTriangle1Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("T1 Rotation", object_.GetTriangle1Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("T1 Position", object_.GetTriangle1Translate(), -3.0f, 3.0f);
+		if (ImGui::Button("Reset T1 SRT")) {
+			// Triangle 1の拡縮・回転・位置を初期状態へ戻す
+			float* scale = object_.GetTriangle1Scale();
+			float* rotation = object_.GetTriangle1Rotate();
+			float* position = object_.GetTriangle1Translate();
+			scale[0] = scale[1] = scale[2] = 1.0f;
+			rotation[0] = rotation[1] = rotation[2] = 0.0f;
+			position[0] = position[1] = position[2] = 0.0f;
+		}
 		ImGui::Separator();
 		ImGui::TextUnformatted("[Triangle 2]");
 		ImGui::SliderFloat3("T2 Scale", object_.GetTriangle2Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("T2 Rotation", object_.GetTriangle2Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("T2 Position", object_.GetTriangle2Translate(), -3.0f, 3.0f);
+		if (ImGui::Button("Reset T2 SRT")) {
+			// Triangle 2の拡縮・回転・位置を初期状態へ戻す
+			float* scale = object_.GetTriangle2Scale();
+			float* rotation = object_.GetTriangle2Rotate();
+			float* position = object_.GetTriangle2Translate();
+			scale[0] = scale[1] = scale[2] = 1.0f;
+			rotation[0] = rotation[1] = rotation[2] = 0.0f;
+			position[0] = position[1] = position[2] = 0.0f;
+		}
 	}
 	// 三角錐2個モードでは、各三角錐のTransformを個別に表示する
 	if (displayMode == 4) {
@@ -183,11 +213,31 @@ void SceneSettingsEditorObject::DrawProperties() {
 		ImGui::SliderFloat3("P1 Scale", object_.GetPyramid1Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("P1 Rotation", object_.GetPyramid1Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("P1 Position", object_.GetPyramid1Translate(), -3.0f, 3.0f);
+		if (ImGui::Button("Reset P1 SRT")) {
+			// Pyramid 1を初期化時の左側の配置へ戻す
+			float* scale = object_.GetPyramid1Scale();
+			float* rotation = object_.GetPyramid1Rotate();
+			float* position = object_.GetPyramid1Translate();
+			scale[0] = scale[1] = scale[2] = 1.0f;
+			rotation[0] = rotation[1] = rotation[2] = 0.0f;
+			position[0] = position[1] = position[2] = 0.0f;
+			position[0] = -0.3f;
+		}
 		ImGui::Separator();
 		ImGui::TextUnformatted("[Pyramid 2]");
 		ImGui::SliderFloat3("P2 Scale", object_.GetPyramid2Scale(), 0.1f, 5.0f);
 		ImGui::SliderFloat3("P2 Rotation", object_.GetPyramid2Rotate(), -3.1415f, 3.1415f);
 		ImGui::SliderFloat3("P2 Position", object_.GetPyramid2Translate(), -3.0f, 3.0f);
+		if (ImGui::Button("Reset P2 SRT")) {
+			// Pyramid 2を初期化時の右側の配置へ戻す
+			float* scale = object_.GetPyramid2Scale();
+			float* rotation = object_.GetPyramid2Rotate();
+			float* position = object_.GetPyramid2Translate();
+			scale[0] = scale[1] = scale[2] = 1.0f;
+			rotation[0] = rotation[1] = rotation[2] = 0.0f;
+			position[0] = position[1] = position[2] = 0.0f;
+			position[0] = 0.3f;
+		}
 	}
 }
 
@@ -198,6 +248,7 @@ SphereEditorObject::SphereEditorObject(
 	bool& isVisible)
 	: sphere_(sphere),
 	textureMode_(textureMode),
+	initialTransform_(sphere.GetTransform()),
 	isVisible_(isVisible) {
 }
 
@@ -269,6 +320,19 @@ void SphereEditorObject::DrawProperties() {
 		&transform.translate.x,
 		0.01f
 	);
+
+	// Sphereの自動回転を開始・停止できるようにする
+	bool isAutoRotating = sphere_.IsAutoRotating();
+	if (ImGui::Button(isAutoRotating ? "Stop Rotation" : "Start Rotation")) {
+		sphere_.SetAutoRotate(!isAutoRotating);
+	}
+	ImGui::SameLine();
+	ImGui::Text("State: %s", isAutoRotating ? "Rotating" : "Stopped");
+
+	if (ImGui::Button("Reset Sphere SRT")) {
+		// 自動回転状態を維持したまま、SphereのSRTを初期化時の値へ戻す
+		transform = initialTransform_;
+	}
 }
 
 ///// ----- OBJ Model ----- /////
@@ -280,6 +344,7 @@ ModelEditorObject::ModelEditorObject(
 	: model_(model),
 	name_(name),
 	textureMode_(textureMode),
+	initialTransform_(model.GetTransform()),
 	isVisible_(isVisible) {
 }
 
@@ -352,6 +417,11 @@ void ModelEditorObject::DrawProperties() {
 		&transform.translate.x,
 		0.01f
 	);
+
+	if (ImGui::Button("Reset SRT")) {
+		// Bunny・Teapot・Suzanneそれぞれの初期配置へ戻す
+		transform = initialTransform_;
+	}
 
 	// OBJファイルから読み込んだ頂点数を確認できるようにする
 	ImGui::Text(
