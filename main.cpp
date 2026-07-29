@@ -23,6 +23,7 @@
 #include "Model.h"
 #include "Audio.h"
 #include "DirectInput.h"
+#include "DebugCamera.h"
 
 #include <windows.h>
 #include <cstdint> // int32_t
@@ -1261,7 +1262,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ParticleSystem particleSystem;
 		particleSystem.Initialize(device.Get(), -0.9f, 0.9f, 50);
 
-		/// --- カメラ ---
+		///// ----- カメラ ----- /////
 		Camera camera;
 
 		camera.Initialize(
@@ -1274,6 +1275,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				transform.scale,
 				transform.rotate,
 				transform.translate);
+
+		///// ----- デバッグカメラ ----- /////
+
+		DebugCamera debugCamera;
+
+		debugCamera.Initialize(
+			float(kClientWidth) /
+			float(kClientHeight));
+
+		// falseは通常カメラ、trueはデバッグカメラを使用する
+		bool isDebugCameraActive = false;
+
 
 		///// ----- 球 (Sphere) ----- /////
 		Sphere sphere;
@@ -1708,23 +1721,44 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 					const Vector2 mouseDelta = {
 						io.MouseDelta.x,
-						io.MouseDelta.y};
+						io.MouseDelta.y
+					};
 
-					// Scene上の左ドラッグでCameraを回転する
-					if (ImGui::IsMouseDragging(
-						ImGuiMouseButton_Left)) {
-						camera.RotateByMouse(mouseDelta);
-					}
+					if (isDebugCameraActive) {
+						// デバッグカメラ有効中は自由移動用の操作を行う
+						if (ImGui::IsMouseDragging(
+							ImGuiMouseButton_Left)) {
+							debugCamera.RotateByMouse(mouseDelta);
+						}
 
-					// Scene上の右ドラッグでCameraを平行移動する
-					if (ImGui::IsMouseDragging(
-						ImGuiMouseButton_Right)) {
-						camera.MoveByMouse(mouseDelta);
-					}
+						if (ImGui::IsMouseDragging(
+							ImGuiMouseButton_Right)) {
+							debugCamera.MoveByMouse(mouseDelta);
+						}
 
-					// Scene上のホイールでCameraを前後移動する
-					if (io.MouseWheel != 0.0f) {
-						camera.ZoomByMouse(io.MouseWheel);
+						if (io.MouseWheel != 0.0f) {
+							debugCamera.MoveForwardByMouse(
+								io.MouseWheel);
+						}
+
+					} else {
+						// 通常カメラ有効中は既存のカメラ操作を行う
+						// Scene上の左ドラッグでCameraを回転する
+						if (ImGui::IsMouseDragging(
+							ImGuiMouseButton_Left)) {
+							camera.RotateByMouse(mouseDelta);
+						}
+
+						// Scene上の右ドラッグでCameraを平行移動する
+						if (ImGui::IsMouseDragging(
+							ImGuiMouseButton_Right)) {
+							camera.MoveByMouse(mouseDelta);
+						}
+
+						// Scene上のホイールでCameraを前後移動する
+						if (io.MouseWheel != 0.0f) {
+							camera.ZoomByMouse(io.MouseWheel);
+						}
 					}
 				}
 
@@ -1759,9 +1793,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					OutputDebugStringA("1\n");
 				}
 
+				// Spaceキーを押した瞬間に使用するカメラを切り替える
+				if (directInput.IsTrigger(DIK_SPACE)) {
+					isDebugCameraActive =
+						!isDebugCameraActive;
+				}
+
 				///// ----- ゲームの処理 ----- /////
 				/// --- カメラ ---
 				camera.Update();
+
+				/// --- デバッグカメラ ---
+				debugCamera.Update();
 
 				// 回転角を更新
 				// Start中だけObject3D自身が回転状態を更新する
@@ -1961,16 +2004,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				}
 
 				///// ----- 行列の計算 ----- /////
-				// ワールド行列の更新
+				/// --- ワールド行列の更新 ---
 				worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
-				// ビュー行列の更新
+				/// --- ビュー行列の更新 ---
+				// 選択中のカメラからView行列を取得する
 				const Matrix4x4& viewMatrix =
-					camera.GetViewMatrix();
+					isDebugCameraActive
+					? debugCamera.GetViewMatrix()
+					: camera.GetViewMatrix();
 
-				// プロジェクション行列の更新
+				/// --- プロジェクション行列の更新 ---
+				// 選択中のカメラからProjection行列を取得する
 				const Matrix4x4& projectionMatrix =
-					camera.GetProjectionMatrix();
+					isDebugCameraActive
+					? debugCamera.GetProjectionMatrix()
+					: camera.GetProjectionMatrix();
 
 				// 三角形・三角錐の頂点と専用WVPはPrimitive3D自身が更新する
 				primitive3D.Update(viewMatrix, projectionMatrix);
