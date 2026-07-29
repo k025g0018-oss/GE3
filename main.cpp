@@ -1400,6 +1400,86 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				textureManager.FindTextureIndex(
 				multiMaterialModel.GetTextureFilePath()));
 
+		///// ----- Bunny OBJ Model ----- /////
+
+		Model bunnyModel;
+
+		// Model::InitializeからModelLoaderを通してbunny.objを読み込む
+		bunnyModel.Initialize(
+			device.Get(),
+			"resources",
+			"bunny.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		bunnyModel.GetTransform().translate = {
+			-4.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Bunnyの表示状態を保持する
+		bool isBunnyVisible = true;
+
+		// MTLで指定された初期Texture番号を取得する
+		int bunnyTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				bunnyModel.GetTextureFilePath()));
+
+
+		///// ----- Teapot OBJ Model ----- /////
+
+		Model teapotModel;
+
+		// Model::InitializeからModelLoaderを通してteapot.objを読み込む
+		teapotModel.Initialize(
+			device.Get(),
+			"resources",
+			"teapot.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		teapotModel.GetTransform().translate = {
+			0.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Teapotの表示状態を保持する
+		bool isTeapotVisible = true;
+
+		// teapot.mtlのcheckerBoard.pngに対応する番号を取得する
+		int teapotTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				teapotModel.GetTextureFilePath()));
+
+
+		///// ----- Suzanne OBJ Model ----- /////
+
+		Model suzanneModel;
+
+		// Model::InitializeからModelLoaderを通してsuzanne.objを読み込む
+		suzanneModel.Initialize(
+			device.Get(),
+			"resources",
+			"suzanne.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		suzanneModel.GetTransform().translate = {
+			4.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Suzanneの表示状態を保持する
+		bool isSuzanneVisible = true;
+
+		// MTLに画像指定がないためWhiteが選択される
+		int suzanneTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				suzanneModel.GetTextureFilePath()));
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1441,18 +1521,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		imguiSrvAllocator.Initialize(srvDescriptorHeap, 64);
 		initInfo.UserData = &imguiSrvAllocator;
 		initInfo.SrvDescriptorAllocFn = [](
-											ImGui_ImplDX12_InitInfo* info,
-											D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle,
-											D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle) {
-												auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
-												allocator->Allocate(cpuHandle, gpuHandle);
+			ImGui_ImplDX12_InitInfo* info,
+			D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle,
+			D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle
+			) {
+				auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+				allocator->Allocate(cpuHandle, gpuHandle);
 			};
 		initInfo.SrvDescriptorFreeFn = [](
-										   ImGui_ImplDX12_InitInfo* info,
-										   D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
-										   D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) {
-											   auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
-											   allocator->Free(cpuHandle, gpuHandle);
+			ImGui_ImplDX12_InitInfo* info,
+			D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
+			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle
+			) {
+				auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+				allocator->Free(cpuHandle, gpuHandle);
 			};
 
 		// 新しいDirectX 12バックエンド初期化形式を使用する
@@ -1505,6 +1587,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			multiMaterialTextureMode,
 			isMultiMaterialVisible);
 
+		// BunnyをHierarchyとPropertiesへ接続する
+		ModelEditorObject bunnyModelEditor(
+			bunnyModel,
+			"Bunny Model",
+			bunnyTextureMode,
+			isBunnyVisible);
+
+		// TeapotをHierarchyとPropertiesへ接続する
+		ModelEditorObject teapotModelEditor(
+			teapotModel,
+			"Teapot Model",
+			teapotTextureMode,
+			isTeapotVisible);
+
+		// SuzanneをHierarchyとPropertiesへ接続する
+		ModelEditorObject suzanneModelEditor(
+			suzanneModel,
+			"Suzanne Model",
+			suzanneTextureMode,
+			isSuzanneVisible);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1520,6 +1623,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&axisModelEditor,
 			&multiMeshModelEditor,
 			&multiMaterialModelEditor,
+			&bunnyModelEditor,
+			&teapotModelEditor,
+			&suzanneModelEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1691,14 +1797,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						direction.z * direction.z);
 
 					// ゼロベクトルは正規化できないため除外する
-					if (length > 0.0001f)
-					{
+					if (length > 0.0001f) {
 						direction.x /= length;
 						direction.y /= length;
 						direction.z /= length;
-					}
-					else
-					{
+					} else {
 						// 不正な方向になった場合は真下へ戻す
 						direction = {0.0f, -1.0f, 0.0f};
 					}
@@ -1709,14 +1812,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				ImGui::Begin("Audio");
 
 				// ONになった瞬間にループ再生し、OFFになった瞬間に停止する
-				if (ImGui::Checkbox("Play Fanfare", &isSoundPlaying))
-				{
-					if (isSoundPlaying)
-					{
+				if (ImGui::Checkbox("Play Fanfare", &isSoundPlaying)) {
+					if (isSoundPlaying) {
 						audio.SoundPlayWave(soundData1, true);
-					}
-					else
-					{
+					} else {
 						audio.SoundStopWave();
 					}
 				}
@@ -1730,9 +1829,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						sceneRenderTexture.GetSRVHandle(),
 						selectedObject);
 
-				if (isSceneHovered)
-				{
-					ImGuiIO &io = ImGui::GetIO();
+				if (isSceneHovered) {
+					ImGuiIO& io = ImGui::GetIO();
 
 					const Vector2 mouseDelta = {
 						io.MouseDelta.x,
@@ -1795,7 +1893,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif // USE_IMGUI
 
 				///// ----- キーボードの処理 ----- /////
-				
+
 				// 毎フレーム、キーボード状態を更新する
 				directInput.Update();
 
@@ -2065,7 +2163,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					viewMatrix,
 					projectionMatrix);
 
-				// Object3D用WVPを計算する
+				// Bunny専用のWVPを更新する
+				bunnyModel.Update(
+					viewMatrix,
+					projectionMatrix);
+
+				// Teapot専用のWVPを更新する
+				teapotModel.Update(
+					viewMatrix,
+					projectionMatrix);
+
+				// Suzanne専用のWVPを更新する
+				suzanneModel.Update(
+					viewMatrix,
+					projectionMatrix);
+
+				/// --- Object3D用WVPを計算する ---
 				// ワールド、ビュー、プロジェクションを掛け合わせる
 				Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
 
@@ -2443,6 +2556,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						textureManager);
 				}
 
+				/// --- Bunnyモデル描画 ---
+
+				if (isBunnyVisible) {
+					// ImGuiで選択されたTextureをBunnyへ設定する
+					const D3D12_GPU_DESCRIPTOR_HANDLE bunnyTextureHandle =
+						textureManager.GetSrvHandle(
+							static_cast<uint32_t>(
+							bunnyTextureMode));
+
+					bunnyModel.Draw(
+						commandList,
+						bunnyTextureHandle);
+				}
+
+				/// --- Teapotモデル描画 ---
+
+				if (isTeapotVisible) {
+					// ImGuiで選択されたTextureをTeapotへ設定する
+					const D3D12_GPU_DESCRIPTOR_HANDLE teapotTextureHandle =
+						textureManager.GetSrvHandle(
+							static_cast<uint32_t>(
+							teapotTextureMode));
+
+					teapotModel.Draw(
+						commandList,
+						teapotTextureHandle);
+				}
+
+				/// --- Suzanneモデル描画 ---
+
+				if (isSuzanneVisible) {
+					// ImGuiで選択されたTextureをSuzanneへ設定する
+					const D3D12_GPU_DESCRIPTOR_HANDLE suzanneTextureHandle =
+						textureManager.GetSrvHandle(
+							static_cast<uint32_t>(
+							suzanneTextureMode));
+
+					suzanneModel.Draw(
+						commandList,
+						suzanneTextureHandle);
+				}
+
 				/// --- Texture ---
 				// 三角形とは別に選択されたTextureを取得する
 				if (isSpriteVisible) {
@@ -2497,12 +2652,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///// ----- 解放処理 ----- /////
 		/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
 		vertexBuffer.Finalize();
+
 		primitive3D.Finalize();
 		sphere.Finalize();			   // 球
 		planeModel.Finalize();		   // OBJ平面のリソースを解放する
 		axisModel.Finalize();		   // Axisモデルのリソースを解放する
 		multiMeshModel.Finalize();	   // 複数Meshモデルのリソースを解放する
 		multiMaterialModel.Finalize(); // 複数Materialモデルのリソースを解放する
+		bunnyModel.Finalize(); // bunnyモデルのリソースを解放
+		teapotModel.Finalize(); // teapotモデルのリソースを解放
+		suzanneModel.Finalize();// suzanneモデルのリソースを解放
 		sprite2D.Finalize();
 		particleSystem.Finalize();
 		// ComPtrへ変更したResourceはデストラクタが自動解放する

@@ -22,7 +22,8 @@ void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList*
 		"resources/white.png",
 		"resources/uvChecker.png",
 		"resources/genbaneko.png",
-		"resources/monsterBall.png"
+		"resources/monsterBall.png",
+		"resources/checkerBoard.png"
 	};
 
 	// ImGuiが0番を使うため、Texture用SRVは1番から使用する
@@ -79,6 +80,10 @@ uint32_t TextureManager::FindTextureIndex(
 
 	if (filePath == "resources/monsterBall.png") {
 		return 3;
+	}
+
+	if (filePath == "resources/checkerBoard.png") {
+		return 4;
 	}
 
 	// 対応する画像がない場合は白テクスチャを使う
