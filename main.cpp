@@ -68,7 +68,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 #pragma comment(lib, "dxcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
 
-/// --- 関数の定義エリア ---
+///// ----- 関数の定義エリア ----- /////
 #pragma region
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -79,6 +79,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	}
 #endif // USE_IMGUI
 
+	/// --- ウィンドウの比率 (16:9) ---
+
+	// ドラッグしても比率が変わらないようにする
+	const LONG kAspectWidth = 16;
+	const LONG kAspectHeight = 9;
+
 	// メッセージに応じてゲーム固有の処理を行う
 	switch (msg) {
 		// ウィンドウが破棄された
@@ -86,6 +92,47 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 			// OSに対して、アプリの終了を伝える
 			PostQuitMessage(0);
 			return 0;
+
+			// ウィンドウの端をドラッグして大きさを変えている途中
+		case WM_SIZING:
+		{
+			// これから変わる予定のウィンドウの大きさ
+			RECT* rect = reinterpret_cast<RECT*>(lparam);
+
+			// 枠とタイトルバーの文の大きさを求める
+			RECT frame = {0, 0, 0, 0};
+			AdjustWindowRect(&frame, WS_OVERLAPPEDWINDOW, FALSE);
+			const LONG frameWidth = frame.right - frame.left;
+			const LONG frameHeight = frame.bottom - frame.top;
+
+			// 中身(描画部分の大きさ)
+			LONG clientWidth = (rect->right - rect->left) - frameWidth;
+			LONG clientHeight = (rect->bottom - rect->top) - frameHeight;
+
+			switch (wparam) {
+				// 上か下をつかんだときは、高さに合わせて幅を決める
+				case WMSZ_TOP:
+				case WMSZ_BOTTOM:
+					clientWidth = clientHeight * kAspectWidth / kAspectHeight;
+					rect->right = rect->left + clientWidth + frameWidth;
+					break;
+
+					//上側の角をつかんだときは、幅に合わせて上の辺を動かす
+				case WMSZ_TOPLEFT:
+				case WMSZ_TOPRIGHT:
+					clientHeight = clientWidth * kAspectHeight / kAspectWidth;
+					rect->top = rect->bottom - clientHeight - frameHeight;
+					break;
+
+					// 左右・下側の角をつかんだときは、幅に合わせて下の辺を動かす
+				default:
+					clientHeight = clientWidth * kAspectHeight / kAspectWidth;
+					rect->bottom = rect->top + clientHeight + frameHeight;
+					break;
+			}
+
+			return TRUE;
+		}
 	}
 
 	// 標準のメッセージ処理を行う
@@ -847,6 +894,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 出力ウィンドウへの文字出力
 		OutputDebugStringA("Hello,DirectX!\n");
 
+		///// ----- ウィンドウ ----- /////
+
 		WNDCLASS wc{};
 		// ウィンドウプロシージャ
 		wc.lpfnWndProc = WindowProc;
@@ -860,13 +909,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ウィンドウクラスを登録する
 		RegisterClass(&wc);
 
-		// クライアント領域のサイズ
+		// クライアント領域のサイズ (ゲーム内部の解像度)
 		const int32_t kClientWidth = 1280;
 		const int32_t kClientHeight = 720;
 
 		// ウィンドウサイズを表す構造体にクライアント領域を入れる
 		RECT wrc = {0, 0, kClientWidth, kClientHeight};
-
 		// クライアント領域をもとに実際のサイズにwrcを変更してもらう
 		AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
@@ -884,6 +932,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			wc.hInstance,		  // インスタンスハンドル
 			nullptr				  // オプション
 		);
+
+		/// --- ウィンドウサイズ ---
+
+		// クライアント領域のサイズ
+		const int kWindowWidth = 1600;
+		const int kWindowHeight = 900;
+
+		// 中身(描画部分)がこの大きさになるように、枠とタイトルバーの分を足す
+		RECT windowRect = {0, 0, kWindowWidth, kWindowHeight};
+		AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+		// ウィンドウの大きさを変える (位置はそのまま)
+		SetWindowPos(hwnd, nullptr, 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOMOVE | SWP_NOZORDER);
+
+		// ウィンドウを表示する
+		ShowWindow(hwnd, SW_SHOW);
+
+		// クライアント領域をもとに実際のサイズにwrcを変更してもらう
+		AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
+
+		
 
 		// ウィンドウを表示する
 		ShowWindow(hwnd, SW_SHOW);
@@ -1661,6 +1730,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					continue;
 				}
 
+#ifdef USE_IMGUI
+
+				// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+				// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
 				if (clientWidth != backBufferWidth || clientHeight != backBufferHeight) {
 					// ResizeBuffers前にGPUのBackBuffer参照を完了させる
 					commandContext.ExecuteAndWait();
@@ -1692,6 +1765,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					editorScissorRect.bottom = static_cast<LONG>(clientHeight);
 					camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 				}
+
+#endif // USE_IMGUI
 
 				///// ----- ImGui先頭 ----- /////
 #ifdef USE_IMGUI
