@@ -105,5 +105,3 @@ bool DirectInput::IsTrigger(uint8_t keyNumber) const {
 
 	return isCurrentPress && !wasPreviousPress;
 }
-
-// できてると思われる このメッセージは次のコミットで削除されGE3_01_02からGE3_01_03へ移動します
