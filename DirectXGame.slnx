@@ -1,10 +1,19 @@
 <Solution>
   <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Development" />
+    <BuildType Name="Release" />
     <Platform Name="x64" />
   </Configurations>
   <Folder Name="/ソリューション項目/">
     <File Path=".editorconfig" />
   </Folder>
-  <Project Path="DirectXGame.vcxproj" Id="93c8e758-6004-4558-8417-581133e4c936" />
-  <Project Path="externals/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj" Id="371b9fa9-4c90-4ac6-a123-aced756d6c77" />
+  <Project Path="DirectXGame.vcxproj" Id="93c8e758-6004-4558-8417-581133e4c936">
+    <BuildType Solution="Debug|*" Project="Development" />
+    <BuildType Solution="Development|*" Project="Release" />
+  </Project>
+  <Project Path="externals/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj" Id="371b9fa9-4c90-4ac6-a123-aced756d6c77">
+    <BuildType Solution="Debug|*" Project="Development" />
+    <BuildType Solution="Development|*" Project="Release" />
+  </Project>
 </Solution>
