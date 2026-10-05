@@ -2806,6 +2806,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// XAudio2を明示的に解放する（内部でxAudio2_.Reset()を呼ぶ）
 		audio.Finalize();
 
+		// 入力を開放する (ウィンドウを閉じる前に、キーボードの取得をやめる)
+		directInput.Finalize();
+
 		CloseWindow(hwnd);
 
 	} // leakCheckerより後に作られたComPtrを先に解放する

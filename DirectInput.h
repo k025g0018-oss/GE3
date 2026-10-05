@@ -36,6 +36,8 @@ public:
 	/// <summary>
 	/// 解放処理
 	/// </summary>
+	// キーボード入力取得をやめて、デバイスとDirectInput本体を開放する
+	void Finalize();
 	
 	/// <summary>
 	/// キーが押されている間trueを返す

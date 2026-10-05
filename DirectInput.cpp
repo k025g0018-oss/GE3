@@ -80,6 +80,19 @@ void DirectInput::Update() {
 	*/
 }
 
+/// <summary>
+/// 解放処理
+/// </summary>
+void DirectInput::Finalize() {
+
+	if (keyboard_) {
+		keyboard_->Unacquire();
+		keyboard_.Reset();
+	}
+
+	directInput_.Reset();
+}
+
 bool DirectInput::IsPress(uint8_t keyNumber) const {
 	// 最上位ビットが立っていれば、現在キーが押されている
 	return (keys_[keyNumber] & 0x80) != 0;
