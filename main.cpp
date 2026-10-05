@@ -952,7 +952,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// クライアント領域をもとに実際のサイズにwrcを変更してもらう
 		AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
-		
+
 
 		// ウィンドウを表示する
 		ShowWindow(hwnd, SW_SHOW);
@@ -2021,6 +2021,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				if (directInput.IsTrigger(DIK_SPACE)) {
 					isDebugCameraActive =
 						!isDebugCameraActive;
+				}
+
+				/// --- Spriteの移動 ---
+
+				// 1フレームで動く量(ピクセル)
+				const float kSpriteSpeed = 5.0f;
+
+				// Spriteの位置を参照で受け取って、直接書き換える
+				Transform& spriteTransform = sprite2D.GetTransform();
+
+				// 左右キーで横に動かす
+				if (directInput.IsPress(DIK_LEFT)) {
+					spriteTransform.translate.x -= kSpriteSpeed;
+				}
+				if (directInput.IsPress(DIK_RIGHT)) {
+					spriteTransform.translate.x += kSpriteSpeed;
+				}
+
+				// 上下キーで縦に動かす(画面座標は下がプラスなので、上はマイナス)
+				if (directInput.IsPress(DIK_UP)) {
+					spriteTransform.translate.y -= kSpriteSpeed;
+				}
+				if (directInput.IsPress(DIK_DOWN)) {
+					spriteTransform.translate.y += kSpriteSpeed;
 				}
 
 				///// ----- ゲームの処理 ----- /////
